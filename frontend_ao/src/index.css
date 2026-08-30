@@ -494,6 +494,16 @@ input:focus {
   min-width: 10rem;
 }
 
+/* V2 — select isolé (hors .card-form), ex. Historique / checklist pièces */
+.select-dark {
+  border: 1px solid var(--line);
+  background: var(--ink-2);
+  color: var(--paper);
+  border-radius: 8px;
+  padding: 0.4rem 0.6rem;
+  font: inherit;
+}
+
 .table-wrap {
   overflow: auto;
   border: 1px solid var(--line);

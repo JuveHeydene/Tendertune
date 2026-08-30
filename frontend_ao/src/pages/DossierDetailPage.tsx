@@ -655,6 +655,7 @@ function PiecesChecklist({ dossierId, allDocs }: { dossierId: string; allDocs: D
                 </td>
                 <td>
                   <select
+                    className="select-dark"
                     defaultValue=""
                     onChange={async (e) => {
                       if (!e.target.value) return
@@ -716,7 +717,12 @@ function HistoriqueTab({ dossierId }: { dossierId: string }) {
       <label className="muted" htmlFor="historique-select">
         Section :{' '}
       </label>
-      <select id="historique-select" value={selected || ''} onChange={(e) => setSelected(e.target.value)}>
+      <select
+        id="historique-select"
+        className="select-dark"
+        value={selected || ''}
+        onChange={(e) => setSelected(e.target.value)}
+      >
         {outline.map((o) => (
           <option key={o.key} value={o.key}>
             {o.title}

@@ -421,56 +421,6 @@ export function ConversationThread() {
 
         <div className="conv-chat-scroll">
           <div className="messages">
-            {pendingFile ? (
-              <article className="attach-choice" aria-live="polite">
-                <p className="attach-status-title">📎 {pendingFile.name}</p>
-                <p className="muted">Comment utiliser ce document ?</p>
-                <label className="attach-choice-option">
-                  <input
-                    type="radio"
-                    name="attach-role"
-                    checked={pendingRole === 'annexe'}
-                    onChange={() => setPendingRole('annexe')}
-                  />
-                  <span>
-                    <strong>Aide ponctuelle pour ce dossier uniquement</strong>
-                    <br />
-                    <span className="muted">
-                      Sert à vous aider à rédiger ce dossier. Invisible depuis les autres dossiers, non
-                      conservé dans le patrimoine.
-                    </span>
-                  </span>
-                </label>
-                <label className="attach-choice-option">
-                  <input
-                    type="radio"
-                    name="attach-role"
-                    checked={pendingRole === 'patrimoine'}
-                    onChange={() => setPendingRole('patrimoine')}
-                  />
-                  <span>
-                    <strong>Ajouter au patrimoine de l'entreprise</strong>
-                    <br />
-                    <span className="muted">
-                      Utilisable pour TOUS les futurs dossiers. À réserver aux documents de référence
-                      validés (méthodo, certifications, CV...).
-                    </span>
-                  </span>
-                </label>
-                <div className="attach-choice-actions">
-                  <button type="button" className="btn-ghost" onClick={() => setPendingFile(null)}>
-                    Annuler
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    onClick={() => onAttach(pendingFile, pendingRole)}
-                  >
-                    Confirmer
-                  </button>
-                </div>
-              </article>
-            ) : null}
             {attachJob ? (
               <article
                 className={`attach-status attach-status--${attachJob.phase}`}
@@ -544,6 +494,53 @@ export function ConversationThread() {
             <div ref={messagesEndRef} />
           </div>
         </div>
+
+        {pendingFile ? (
+          <article className="attach-choice" aria-live="polite">
+            <p className="attach-status-title">📎 {pendingFile.name}</p>
+            <p className="muted">Comment utiliser ce document ?</p>
+            <label className="attach-choice-option">
+              <input
+                type="radio"
+                name="attach-role"
+                checked={pendingRole === 'annexe'}
+                onChange={() => setPendingRole('annexe')}
+              />
+              <span>
+                <strong>Aide ponctuelle pour ce dossier uniquement</strong>
+                <br />
+                <span className="muted">
+                  Sert à vous aider à rédiger ce dossier. Invisible depuis les autres dossiers, non
+                  conservé dans le patrimoine.
+                </span>
+              </span>
+            </label>
+            <label className="attach-choice-option">
+              <input
+                type="radio"
+                name="attach-role"
+                checked={pendingRole === 'patrimoine'}
+                onChange={() => setPendingRole('patrimoine')}
+              />
+              <span>
+                <strong>Ajouter au patrimoine de l'entreprise</strong>
+                <br />
+                <span className="muted">
+                  Utilisable pour TOUS les futurs dossiers. À réserver aux documents de référence validés
+                  (méthodo, certifications, CV...).
+                </span>
+              </span>
+            </label>
+            <div className="attach-choice-actions">
+              <button type="button" className="btn-ghost" onClick={() => setPendingFile(null)}>
+                Annuler
+              </button>
+              <button type="button" className="btn-primary" onClick={() => onAttach(pendingFile, pendingRole)}>
+                Confirmer
+              </button>
+            </div>
+          </article>
+        ) : null}
 
         <form className="conv-composer" onSubmit={onSend}>
           <div className="conv-composer-row">
