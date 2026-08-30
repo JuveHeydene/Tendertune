@@ -76,6 +76,12 @@ def _driver():
     return GraphDatabase.driver(s.neo4j_uri, auth=(s.neo4j_user, s.neo4j_password))
 
 
+# Alias publics — réutilisés par l'Expert Graphe (app/rag/graph_expert.py,
+# §4.7) : même driver, même index fuzzy tenant, un seul outil partagé
+# entre horloge A (écriture) et horloge B (lecture).
+neo4j_driver = _driver
+
+
 def _ensure_indexes(driver) -> None:
     with driver.session() as neo:
         neo.run(
@@ -100,6 +106,9 @@ def _load_tenant_index(neo, tenant_id: UUID) -> EntityMatchIndex:
             n += 1
     log.info("GRAPH fuzzy : %s entités tenant déjà en Neo4j", n)
     return index
+
+
+load_tenant_index = _load_tenant_index
 
 
 def _canonical_key(

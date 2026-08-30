@@ -80,8 +80,14 @@ def upsert_chunks(
     doc_role: str,
     chunks: list[ChunkDraft],
     vectors: list[list[float]],
+    section_types: dict | None = None,
+    dossier_id: UUID | None = None,
 ) -> None:
+    """`section_types` : {chunk_id: section_type|None}, calculé une fois par
+    parent et propagé à ses enfants (§3.1) — filtre DOUX côté retrieval (§4.4).
+    `dossier_id` : requis si doc_role="annexe" (§1.5), pour le scope-dossier."""
     s = get_settings()
+    section_types = section_types or {}
     points = []
     for ch, vec in zip(chunks, vectors, strict=True):
         points.append(
@@ -98,6 +104,8 @@ def upsert_chunks(
                     "page_group": (ch.extra or {}).get("page_group"),
                     "parent_id": str(ch.parent_id) if ch.parent_id else None,
                     "text": ch.text[:2000],
+                    "section_type": section_types.get(ch.id),
+                    "dossier_id": str(dossier_id) if dossier_id else None,
                 },
             )
         )

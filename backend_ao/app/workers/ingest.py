@@ -110,8 +110,11 @@ async def ingest_document(ctx: dict, document_id: str) -> str:
                 len(section_type_by_parent),
             )
 
+            chunk_section_types: dict = {}
             for d in drafts:
                 parent_key = d.id if d.parent_id is None else d.parent_id
+                section_type_value = section_type_by_parent.get(parent_key)
+                chunk_section_types[d.id] = section_type_value
                 session.add(
                     ChunkRow(
                         id=d.id,
@@ -122,7 +125,7 @@ async def ingest_document(ctx: dict, document_id: str) -> str:
                         page=d.page,
                         token_count=d.token_count,
                         extra=d.extra,
-                        section_type=section_type_by_parent.get(parent_key),
+                        section_type=section_type_value,
                     )
                 )
             await session.flush()
@@ -162,6 +165,8 @@ async def ingest_document(ctx: dict, document_id: str) -> str:
                     doc_role=doc.doc_role,
                     chunks=embeddable,
                     vectors=vectors,
+                    section_types=chunk_section_types,
+                    dossier_id=doc.dossier_id,
                 )
                 log.info("[F] QDRANT FIN — vecteurs stockés")
 

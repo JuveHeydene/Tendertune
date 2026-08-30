@@ -17,6 +17,32 @@ def ollama_generate(prompt: str, *, timeout: int = 180) -> str:
     return "".join(ollama_generate_stream(prompt, timeout=timeout))
 
 
+def ollama_generate_json(prompt: str, *, timeout: int = 120) -> dict:
+    """Appel JSON contraint (format='json' côté Ollama) — utilisé par le
+    Superviseur, le rewrite, le grading LLM-juge et l'extraction d'entités
+    de requête (V2). Ne lève jamais côté JSON invalide : retourne {} et
+    laisse l'appelant décider du repli déterministe."""
+    s = get_settings()
+    url = f"{s.ollama_base_url.rstrip('/')}/api/generate"
+    payload = json.dumps(
+        {"model": s.llm_model, "prompt": prompt, "stream": False, "format": "json"}
+    ).encode()
+    req = urllib.request.Request(
+        url, data=payload, headers={"Content-Type": "application/json"}, method="POST"
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            raw = json.loads(resp.read().decode())
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"Ollama injoignable ({url}) : {exc}") from exc
+    body = raw.get("response") or "{}"
+    try:
+        return json.loads(body)
+    except json.JSONDecodeError:
+        log.warning("ollama_generate_json — réponse non-JSON, {} renvoyé : %r", body[:200])
+        return {}
+
+
 def ollama_generate_stream(prompt: str, *, timeout: int = 180) -> Iterator[str]:
     s = get_settings()
     url = f"{s.ollama_base_url.rstrip('/')}/api/generate"
