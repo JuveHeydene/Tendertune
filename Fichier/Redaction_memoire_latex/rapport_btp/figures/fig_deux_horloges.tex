@@ -1,0 +1,34 @@
+% Architecture générale : deux horloges indépendantes
+\begin{tikzpicture}[node distance=4mm and 7mm]
+
+  % --- Horloge A ---
+  \node[btptitleband, text width=12.2cm, fill=btpblue] (ta)
+    {Horloge A — Ingestion \textnormal{\small(asynchrone, non bloquante)}};
+  \node[btpbox, text width=1.9cm, below=7mm of ta.south west, anchor=north west] (a1) {Dépôt};
+  \node[btpbox, text width=1.9cm, right=of a1] (a2) {Stockage};
+  \node[btpbox, text width=1.9cm, right=of a2] (a3) {Analyse\\structurelle};
+  \node[btpbox, text width=1.9cm, right=of a3] (a4) {Découpage\\en extraits};
+  \node[btpbox, text width=1.9cm, right=of a4] (a5) {Indexation};
+  \foreach \i/\j in {1/2, 2/3, 3/4, 4/5} {\draw[btparrow] (a\i) -- (a\j);}
+  \node[btplabel, below=2.5mm of a3, text width=8cm]
+    {Traitement long, exécuté en arrière-plan par des travailleurs dédiés};
+
+  % --- Horloge B ---
+  \node[btptitleband, text width=12.2cm, fill=btpsky,
+        below=16mm of ta.south west, anchor=north west] (tb)
+    {Horloge B — Exploitation \textnormal{\small(synchrone, interactive)}};
+  \node[btpboxalt, text width=1.9cm, below=7mm of tb.south west, anchor=north west] (b1) {Question};
+  \node[btpboxalt, text width=1.9cm, right=of b1] (b2) {Recherche\\hybride};
+  \node[btpboxalt, text width=1.9cm, right=of b2] (b3) {Contexte};
+  \node[btpboxalt, text width=1.9cm, right=of b3] (b4) {Génération\\contrainte};
+  \node[btpboxalt, text width=1.9cm, right=of b4] (b5) {Validation\\humaine};
+  \foreach \i/\j in {1/2, 2/3, 3/4, 4/5} {\draw[btparrow] (b\i) -- (b\j);}
+  \node[btplabel, below=2.5mm of b3, text width=8cm]
+    {Traitement court, borné en temps, restituant un résultat vérifiable};
+
+  % --- Liaison ---
+  \draw[btparrowlight, dashed] (a5.south) -- ++(0,-0.55)
+    node[btplabel, right, xshift=1mm, yshift=1mm] {base de connaissances partagée}
+    -| (b2.north);
+
+\end{tikzpicture}

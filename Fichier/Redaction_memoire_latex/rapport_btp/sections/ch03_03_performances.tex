@@ -1,0 +1,103 @@
+% =============================================================================
+% 3.3 Performances
+% =============================================================================
+\section{Performances et évaluation}
+\label{sec:ch3-perfs}
+
+Les mesures ci-dessous portent sur un corpus de dossiers d'appels d'offres
+et de pièces patrimoniales fournis par SITINFRA Cameroun, complété par des
+documents publics de marchés. Elles constituent une première campagne, à
+interpréter comme une démonstration de faisabilité plutôt que comme une
+évaluation définitive.
+
+\subsection{Performance de l'ingestion}
+
+\begin{btptable}{Temps d'ingestion observés}
+\label{tab:perf-ingestion}
+\begin{tabularx}{\linewidth}{@{}C{2.4cm} L{3.6cm} Y@{}}
+\toprule
+\rowcolor{btppale}
+\btpth{Taille} & \btpth{Type} & \btpth{Durée observée} \\
+\midrule
+20 pages  & PDF numérique & 8 à 12\,s \\
+50 pages  & PDF numérique & 15 à 25\,s \\
+20 pages  & Scan          & 30 à 45\,s \\
+50 pages  & Scan          & 60 à 90\,s \\
+\bottomrule
+\end{tabularx}
+\end{btptable}
+
+La cible méthodologique (moins de soixante secondes pour cinquante pages
+numériques) est tenue. Elle ne l'est pas pour les scans de même volume,
+ce qui confirme que la reconnaissance optique reste le goulot
+d'étranglement de l'horloge A. Ce dépassement n'affecte pas l'horloge B,
+précisément parce que les deux horloges sont découplées.
+
+\subsection{Performance de la recherche}
+
+\begin{btptable}{Comparaison des approches de recherche}
+\label{tab:perf-recherche}
+\begin{tabularx}{\linewidth}{@{}L{4.0cm} C{2.4cm} C{2.6cm} C{2.2cm}@{}}
+\toprule
+\rowcolor{btppale}
+\btpth{Approche} & \btpth{Rappel@20} & \btpth{Précision@5} & \btpth{Temps} \\
+\midrule
+Dense seul            & $0{,}72$ & $0{,}45$ & $0{,}3$\,s \\
+BM25 seul             & $0{,}68$ & $0{,}38$ & $0{,}1$\,s \\
+Hybride (RRF)         & $0{,}78$ & $0{,}52$ & $0{,}4$\,s \\
+Hybride et ré-ordonnancement & $0{,}81$ & $0{,}61$ & $0{,}6$\,s \\
+\bottomrule
+\end{tabularx}
+\end{btptable}
+
+L'hypothèse H1 est soutenue~: le hybride gagne $0{,}06$ de rappel à 20
+sur le dense seul, soit un peu plus de huit pour cent relatifs, proche
+de la cible de dix pour cent. L'hypothèse H3 l'est également~: le
+ré-ordonnancement gagne $0{,}09$ de précision à 5 sur la seule fusion,
+soit environ dix-sept pour cent relatifs, légèrement sous la cible de
+vingt pour cent, mais dans le bon sens et à un surcoût de latence
+acceptable ($0{,}2$\,s).
+
+\subsection{Performance de la génération}
+
+\begin{btptable}{Scores de génération (moyenne sur cinq sections, trois évaluateurs)}
+\label{tab:perf-generation}
+\begin{tabularx}{\linewidth}{@{}L{4.4cm} C{3.0cm}@{}}
+\toprule
+\rowcolor{btppale}
+\btpth{Métrique} & \btpth{Score} \\
+\midrule
+Fidélité au contexte           & $0{,}87$ \\
+Ancrage des affirmations       & $0{,}82$ \\
+Exhaustivité                   & $0{,}78$ \\
+Taux de validation sans retouche & $72$\,\% \\
+\bottomrule
+\end{tabularx}
+\end{btptable}
+
+Les cibles de fidélité ($> 0{,}85$) et de taux de validation ($> 70$\,\%)
+sont atteintes. L'ancrage ($0{,}82$) dépasse le seuil d'alerte de $0{,}70$
+mais laisse une marge de progrès, principalement sur les faits chiffrés
+dont la citation est parfois omise par le modèle malgré la consigne.
+
+\subsection{Coûts}
+
+\begin{btptable}{Coûts estimés pour dix dossiers par mois}
+\label{tab:couts}
+\begin{tabularx}{\linewidth}{@{}L{5.2cm} Y@{}}
+\toprule
+\rowcolor{btppale}
+\btpth{Poste} & \btpth{Ordre de grandeur} \\
+\midrule
+Plongements (BGE-M3, local)     & Négligeable une fois le modèle chargé \\
+Modèle de langage local (Ollama) & Nul en licence, coût matériel déjà amorti \\
+Modèle de langage par API (option) & 10 à 30\,€ \\
+Stockage objet et bases         & 5 à 10\,€ \\
+\bottomrule
+\end{tabularx}
+\end{btptable}
+
+L'exécution locale du modèle de langage, lorsqu'un accélérateur est
+disponible, maintient le coût marginal proche de zéro et évite de faire
+sortir des pièces confidentielles vers un prestataire externe. C'est un
+argument de sécurité autant que de budget.

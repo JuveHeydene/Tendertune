@@ -1,0 +1,33 @@
+# Secrets et env local
+.env
+.env.local
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+dist/
+build/
+
+# Front
+node_modules/
+frontend_ao/dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Données locales / temporaires
+data/
+tmp/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

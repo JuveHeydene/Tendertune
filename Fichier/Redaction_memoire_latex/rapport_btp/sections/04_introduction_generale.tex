@@ -1,0 +1,109 @@
+% =============================================================================
+% Introduction générale
+% =============================================================================
+\btpLiminary{Introduction générale}
+
+\section*{Contexte}
+
+Le secteur du Bâtiment et des Travaux Publics constitue l'un des piliers de
+l'économie camerounaise. Il est caractérisé par une compétition intense où la
+réponse aux appels d'offres représente un enjeu stratégique majeur. Chaque
+année, des centaines d'entreprises et de bureaux d'études consacrent des
+ressources considérables à la préparation de dossiers de candidature, un
+processus qui mobilise simultanément des compétences juridiques, techniques,
+financières et administratives.
+
+L'émergence des technologies d'intelligence artificielle, et plus
+particulièrement des grands modèles de langage, ouvre des perspectives inédites
+pour automatiser et optimiser ce processus. Cependant, la spécificité des
+appels d'offres — leur caractère hautement structuré, leur exigence de
+traçabilité et de conformité, et leur dimension juridique contraignante —
+impose une approche réfléchie et méthodique. Un système qui invente une
+référence, omet une pièce obligatoire ou cite une clause inexistante ne
+constitue pas seulement une gêne~: il expose l'entreprise à l'élimination de
+son offre.
+
+\section*{Problématique}
+
+\begin{btpquote}
+Comment concevoir et développer une plateforme permettant de capitaliser le
+patrimoine documentaire d'un bureau d'études du BTP et de générer
+automatiquement des dossiers de réponse aux appels d'offres en s'appuyant sur
+ce patrimoine, tout en garantissant la traçabilité des sources, la conformité
+réglementaire et la validation humaine des livrables~?
+\end{btpquote}
+
+Cette question centrale se décline en plusieurs interrogations
+opérationnelles~:
+
+\begin{enumerate}
+  \item Comment transformer un patrimoine documentaire hétérogène, non
+        structuré et partiellement numérisé en une base de connaissances
+        interrogeable~?
+  \item Quelle stratégie de recherche d'information permet de retrouver de
+        manière fiable à la fois des références terminologiques exactes et des
+        concepts métier exprimés différemment~?
+  \item Comment contraindre un modèle de langage à produire un texte
+        exploitable, sourcé et vérifiable plutôt qu'un texte simplement
+        plausible~?
+  \item Quelle place accorder à l'opérateur humain pour que le gain de
+        productivité ne se paie pas d'une perte de fiabilité~?
+\end{enumerate}
+
+\section*{Objectifs}
+
+\subsection*{Objectif général}
+
+Concevoir, développer et valider une plateforme de capitalisation documentaire
+et de génération assistée de dossiers de réponse aux appels d'offres, adaptée
+au contexte d'un bureau d'études du BTP camerounais.
+
+\subsection*{Objectifs spécifiques}
+
+\begin{itemize}
+  \item Caractériser le processus métier de réponse aux appels d'offres et en
+        identifier les points de friction documentaires~;
+  \item Concevoir une chaîne d'ingestion capable de préserver la structure
+        hiérarchique des pièces d'un dossier d'appel d'offres~;
+  \item Concevoir un moteur de recherche hybride combinant recherche lexicale
+        et recherche sémantique, complété par un ré-ordonnancement fin~;
+  \item Concevoir un mécanisme de génération contrainte produisant des sections
+        structurées, citées et traçables~;
+  \item Intégrer un dispositif de supervision humaine à chaque étape critique~;
+  \item Évaluer empiriquement la performance du système sur des indicateurs de
+        recherche et de génération.
+\end{itemize}
+
+\section*{Hypothèses de recherche}
+
+\begin{btptable}{Hypothèses de recherche et critères de validation}
+\begin{tabularx}{\linewidth}{@{}C{1.1cm} Y L{3.5cm}@{}}
+\toprule
+\rowcolor{btppale}
+\btpth{Réf.} & \btpth{Hypothèse} & \btpth{Critère de validation} \\
+\midrule
+H1 & La recherche hybride surpasse la recherche sémantique seule sur un corpus d'appels d'offres. & Gain de rappel à 20 documents \\
+H2 & Le découpage hiérarchique parent-enfant améliore la qualité des réponses par rapport à un découpage à fenêtre fixe. & Gain d'ancrage et d'exhaustivité \\
+H3 & Le ré-ordonnancement par modèle croisé surpasse la seule fusion de rangs. & Gain de précision à 5 documents \\
+H4 & La génération section par section améliore la conformité par rapport à une génération globale. & Gain de couverture des exigences \\
+H5 & La supervision humaine améliore la fiabilité des livrables sans annuler le gain de productivité. & Taux de validation et temps de cycle \\
+\bottomrule
+\end{tabularx}
+\end{btptable}
+
+\section*{Organisation du mémoire}
+
+Ce mémoire s'organise en trois chapitres. Le \textbf{chapitre~1} dresse l'état
+de l'art~: il caractérise le domaine des appels d'offres dans le BTP, puis
+parcourt les disciplines mobilisées, de la gestion documentaire à la génération
+augmentée par récupération, en passant par la recherche d'information, la
+compréhension de documents structurés et la résolution d'entités. Le
+\textbf{chapitre~2} expose la méthodologie~: analyse des besoins, modélisation
+des données, architecture du système, stratégies de recherche et de génération,
+protocole d'évaluation et planification. Le \textbf{chapitre~3} présente la
+plateforme développée, son architecture technique, les résultats de
+l'évaluation et une analyse comparative des approches candidates. Une
+conclusion générale récapitule les contributions et ouvre sur les perspectives.
+
+\btpEndMark
+\clearpage

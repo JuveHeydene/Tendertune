@@ -1,0 +1,33 @@
+% Principe d'un graphe de connaissances appliqué aux appels d'offres
+\begin{tikzpicture}[node distance=16mm and 26mm,
+                    every edge quotes/.style={btplabel, fill=white, inner sep=1.5pt}]
+
+  \node[btpboxstrong, text width=2.2cm] (ent) {ENTREPRISE};
+  \node[btpbox, text width=2.0cm, right=of ent] (proj) {PROJET};
+  \node[btpbox, text width=2.2cm, right=of proj] (client) {CLIENT};
+
+  \node[btpboxalt, text width=2.4cm, below=of ent] (cert) {CERTIFICATION};
+  \node[btpboxalt, text width=2.2cm, below=of proj] (pers) {PERSONNE};
+  \node[btpboxalt, text width=2.2cm, below=of client] (exig) {EXIGENCE};
+
+  \draw[btparrow] (ent) -- node[btplabel, fill=white, inner sep=1.5pt, above]
+       {\textsc{a\_realise}} (proj);
+  \draw[btparrow] (proj) -- node[btplabel, fill=white, inner sep=1.5pt, above]
+       {\textsc{pour}} (client);
+  \draw[btparrow] (ent) -- node[btplabel, fill=white, inner sep=1.5pt, left]
+       {\textsc{detient}} (cert);
+  \draw[btparrow] (ent) -- node[btplabel, fill=white, inner sep=1.5pt, pos=0.32, above, sloped]
+       {\textsc{emploie}} (pers);
+  \draw[btparrow] (pers) -- node[btplabel, fill=white, inner sep=1.5pt, pos=0.5, above, sloped]
+       {\textsc{a\_travaille\_sur}} (proj);
+  \draw[btparrow] (cert) -- node[btplabel, fill=white, inner sep=1.5pt, below]
+       {\textsc{satisfait}} (exig);
+  \draw[btparrowlight] (exig) -- node[btplabel, fill=white, inner sep=1.5pt, right]
+       {\textsc{issue\_de}} (client);
+
+  \node[btplabel, below=7mm of pers, text width=10cm]
+    {Une question comme « quels ingénieurs certifiés ont travaillé sur un projet
+     comparable pour ce maître d'ouvrage~? » se résout par un parcours de
+     chemins dans le graphe, là où une recherche textuelle échouerait.};
+
+\end{tikzpicture}

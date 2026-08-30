@@ -1,0 +1,74 @@
+% =============================================================================
+% 3.5 Discussion
+% =============================================================================
+\section{Discussion}
+\label{sec:ch3-discussion}
+
+\subsection{Forces du système}
+
+Quatre propriétés distinguent la plateforme des outils recensés à la
+section~\ref{sec:ch1-solutions}.
+
+\begin{enumerate}
+  \item \btpterm{Capitalisation active.} Le patrimoine n'est plus seulement
+        archivé~: il est interrogeable et génératif.
+  \item \btpterm{Traçabilité.} Chaque génération est ancrée dans des
+        extraits identifiés, eux-mêmes rattachés à une pièce, une page et
+        une version.
+  \item \btpterm{Fiabilité procédurale.} La revue humaine n'est pas une
+        option de l'interface~: c'est une étape du graphe d'exécution.
+  \item \btpterm{Évolutivité.} L'architecture en couches permet d'ajouter
+        un graphe ou un n\oe ud agentique sans reconstruire le workflow.
+\end{enumerate}
+
+\subsection{Limites actuelles}
+
+Ces forces ne masquent pas quatre limites, qu'il faut énoncer clairement.
+
+\begin{enumerate}
+  \item \btpterm{Dépendance au corpus.} La qualité des réponses est bornée
+        par la qualité et la couverture des documents patrimoniaux. Un
+        bureau d'études dont la mémoire est pauvre n'obtiendra pas, par
+        magie, des références qu'il n'a pas.
+  \item \btpterm{OCR imparfait.} Les scans de mauvaise qualité dégradent
+        l'indexation, donc la recherche, donc la génération. Le goulot
+        d'étranglement mesuré à la section~\ref{sec:ch3-perfs} le confirme.
+  \item \btpterm{Asymétrie linguistique.} Les modèles restent moins
+        performants en français qu'en anglais, a fortiori sur le français
+        juridique des marchés publics camerounais.
+  \item \btpterm{Spécificité de certains dossiers.} Des consultations très
+        atypiques, hors du patrimoine, dépassent les capacités du système,
+        qui doit alors s'abstenir --- ce qu'il fait, mais au prix d'une
+        aide réduite.
+\end{enumerate}
+
+\subsection{Pistes d'amélioration}
+
+\begin{enumerate}
+  \item \btpterm{Adaptation de domaine.} Un affinage ou, à défaut, des
+        invites et des glossaires spécialisés réduiraient l'asymétrie
+        linguistique.
+  \item \btpterm{Récupération agentique localisée.} Encapsuler une
+        recherche multi-sauts dans un n\oe ud du workflow, sans rendre
+        l'ensemble agentique.
+  \item \btpterm{Graphe de connaissances.} Phase 5, une fois le RAG hybride
+        consolidé.
+  \item \btpterm{Hygiène du corpus.} Outils de détection des doublons, des
+        attestations périmées et des scans illisibles, en amont de
+        l'indexation.
+  \item \btpterm{Multimodalité.} Intégration des plans, schémas et images,
+        aujourd'hui hors périmètre.
+\end{enumerate}
+
+\subsection{Conclusion du chapitre}
+
+La plateforme démontre la faisabilité d'un système de capitalisation et de
+génération assistée de dossiers d'appels d'offres dans le secteur du BTP
+camerounais. Les résultats obtenus montrent qu'une recherche hybride
+améliore significativement la pertinence, qu'une génération contrainte
+produit des sections traçables, et qu'un workflow avec revue humaine
+porte la conformité à un niveau compatible avec le caractère engageant
+d'une offre. Les limites identifiées dessinent un programme de travail,
+non un obstacle dirimant.
+
+\btpEndMark

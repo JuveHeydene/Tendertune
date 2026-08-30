@@ -1,0 +1,37 @@
+% Modèle conceptuel des données
+\begin{tikzpicture}[node distance=11mm and 16mm,
+                    card/.style={btplabel, fill=white, inner sep=1.2pt}]
+
+  \node[btpboxstrong, text width=2.0cm] (tenant) {ORGANISATION};
+
+  \node[btpbox, text width=2.0cm, below left=12mm and 20mm of tenant] (user) {UTILISATEUR};
+  \node[btpbox, text width=2.0cm, below=12mm of tenant] (doc) {DOCUMENT};
+  \node[btpbox, text width=2.0cm, below right=12mm and 20mm of tenant] (dossier) {DOSSIER};
+
+  \node[btpboxalt, text width=2.0cm, below=of doc] (chunk) {EXTRAIT};
+
+  \node[btpboxalt, text width=2.0cm, below left=of dossier] (exig) {EXIGENCE};
+  \node[btpboxalt, text width=2.0cm, below=of dossier] (plan) {PLAN};
+  \node[btpboxalt, text width=2.0cm, below right=of dossier] (export) {EXPORT};
+
+  \node[btpbox, text width=2.0cm, below=of plan] (section) {SECTION};
+  \node[btpbox, text width=2.0cm, below=of section] (revue) {REVUE};
+
+  \draw[btparrow] (tenant) -- node[card, pos=0.75] {1..n} (user);
+  \draw[btparrow] (tenant) -- node[card, pos=0.75] {1..n} (doc);
+  \draw[btparrow] (tenant) -- node[card, pos=0.75] {1..n} (dossier);
+  \draw[btparrow] (doc) -- node[card, pos=0.6] {1..n} (chunk);
+  \draw[btparrow] (dossier) -- node[card, pos=0.65] {1..n} (exig);
+  \draw[btparrow] (dossier) -- node[card, pos=0.6] {1..n} (plan);
+  \draw[btparrow] (dossier) -- node[card, pos=0.65] {1..n} (export);
+  \draw[btparrow] (plan) -- node[card, pos=0.6] {1..n} (section);
+  \draw[btparrow] (section) -- node[card, pos=0.6] {1..n} (revue);
+
+  % relation réflexive parent-enfant
+  \draw[btparrowlight] (chunk.west) .. controls +(-1.2,0.4) and +(-1.2,-0.4) .. (chunk.south west)
+    node[card, left, xshift=-9mm, yshift=2mm] {parent / enfant};
+
+  % citation d'un extrait par une section
+  \draw[btpdashed] (section.west) -- node[card, above, sloped] {cite} (chunk.south east);
+
+\end{tikzpicture}

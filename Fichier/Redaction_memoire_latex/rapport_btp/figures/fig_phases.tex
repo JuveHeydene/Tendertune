@@ -1,0 +1,28 @@
+% Phases de développement
+\begin{tikzpicture}[x=1.05cm, y=1cm]
+
+  % axe des semaines
+  \draw[btplight, line width=0.8pt] (0,0) -- (10.4,0);
+  \foreach \x/\lab in {0/S1, 2/S3, 4/S5, 6/S7, 8/S9, 10/S11} {
+    \draw[btplight, line width=0.8pt] (\x,0) -- (\x,-0.14);
+    \node[btplabel, below=0pt] at (\x,-0.14) {\lab};
+  }
+
+  \newcommand{\phase}[5]{%
+    \fill[#5, rounded corners=2pt] (#1,#3-0.24) rectangle (#2,#3+0.24);
+    \node[font=\scriptsize\bfseries, text=white, anchor=west] at (#1+0.12,#3) {#4};
+  }
+
+  \phase{0}{2}{3.2}{Phase 1 — Socle}{btpdeep}
+  \phase{2}{4}{2.5}{Phase 2 — Ingestion}{btpblue}
+  \phase{4}{6}{1.8}{Phase 3 — Recherche hybride}{btpblue!85}
+  \phase{6}{8}{1.1}{Phase 4 — Workflow et supervision}{btpsky}
+  \phase{8}{10}{0.4}{Phase 5 — Graphe (option)}{btpslate}
+
+  \node[btplabel, anchor=west] at (10.5,3.2) {Infrastructure, schéma, sécurité};
+  \node[btplabel, anchor=west] at (10.5,2.5) {Analyse, découpage, indexation};
+  \node[btplabel, anchor=west] at (10.5,1.8) {Fusion, ré-ordonnancement};
+  \node[btplabel, anchor=west] at (10.5,1.1) {Génération, revue, export};
+  \node[btplabel, anchor=west] at (10.5,0.4) {Entités et relations};
+
+\end{tikzpicture}

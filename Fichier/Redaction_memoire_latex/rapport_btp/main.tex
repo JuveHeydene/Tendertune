@@ -1,0 +1,125 @@
+% =============================================================================
+% Mémoire de fin d'études — Master en Intelligence Artificielle & Big Data
+%
+% Conception et implémentation d'une application intelligente pour
+% l'automatisation du traitement et de la réponse aux dossiers d'appels
+% d'offres dans le secteur du BTP — cas de SITINFRA Cameroun
+%
+% Compilation : ./compile.sh      (ou : latexmk -pdf main.tex)
+% =============================================================================
+\documentclass[12pt,a4paper,oneside,openany]{report}
+
+\input{preamble.tex}
+\input{cover.tex}
+
+\hypersetup{
+  pdftitle={\btpTitreCourt},
+  pdfauthor={KEMAYOU Lisette Raymonne Sheylley},
+  pdfsubject={RAG, LLM, dossiers d'appels d'offres, BTP, marchés publics},
+  pdfkeywords={intelligence artificielle, RAG, DAO, BTP, SITINFRA}
+}
+
+\begin{document}
+\color{btpink}
+
+% =============================================================================
+% PAGES DE TITRE
+% =============================================================================
+\hypersetup{pageanchor=false}
+\makecovertitle
+\makeinnertitle
+\hypersetup{pageanchor=true}
+
+% =============================================================================
+% PAGES LIMINAIRES (numérotation romaine)
+% =============================================================================
+\pagenumbering{roman}
+\setcounter{page}{1}
+
+\input{sections/00_dedicace}
+\input{sections/01_remerciements}
+\input{sections/02_resume}
+\input{sections/03_sigles}
+
+\tableofcontents\clearpage
+\listoffigures\clearpage
+\listoftables\clearpage
+
+% =============================================================================
+% CORPS DU MÉMOIRE (numérotation arabe)
+% =============================================================================
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+\input{sections/04_introduction_generale}
+
+% --- Chapitre 1 : État de l'art -------------------------------------------
+\chapter{État de l'art}
+\label{chap:etat-art}
+\btpIntro{C}{e chapitre dresse un panorama des connaissances mobilisées par
+notre problématique. Nous caractérisons d'abord le domaine des appels d'offres
+dans le BTP et ses enjeux documentaires, puis nous parcourons les disciplines
+qui outillent notre réponse~: gestion documentaire, traitement automatique du
+langage, recherche d'information, génération augmentée par récupération,
+compréhension de documents structurés et résolution d'entités. Nous discutons
+enfin les architectures de workflow et les solutions du marché, afin de dégager
+les lacunes que ce travail entend combler.}
+
+\input{sections/ch01_01_introduction}
+\input{sections/ch01_02_contexte_ao}
+\input{sections/ch01_03_ged}
+\input{sections/ch01_04_tal}
+\input{sections/ch01_05_recherche_information}
+\input{sections/ch01_06_rag}
+\input{sections/ch01_07_bases_vectorielles}
+\input{sections/ch01_08_documents_structures}
+\input{sections/ch01_09_entites_graphes}
+\input{sections/ch01_10_workflows}
+\input{sections/ch01_11_solutions_synthese}
+
+% --- Chapitre 2 : Méthodologie --------------------------------------------
+\chapter{Méthodologie}
+\label{chap:methodologie}
+\btpIntro{L}{a méthodologie exposée dans ce chapitre s'inscrit dans une
+démarche de recherche et développement appliquée. Elle articule l'analyse du
+domaine métier, la spécification des besoins, la modélisation des données,
+la conception de l'architecture et la définition des stratégies de recherche,
+de génération et d'évaluation. Chaque choix est explicité et justifié au
+regard des exigences de traçabilité, de conformité et de validation humaine
+propres aux dossiers d'appels d'offres.}
+
+\input{sections/ch02_01_introduction}
+\input{sections/ch02_02_problematique}
+\input{sections/ch02_03_besoins}
+\input{sections/ch02_04_modele_donnees}
+\input{sections/ch02_05_architecture}
+\input{sections/ch02_06_recherche_generation}
+\input{sections/ch02_07_workflow}
+\input{sections/ch02_08_evaluation}
+\input{sections/ch02_09_planification_synthese}
+
+% --- Chapitre 3 : Résultats et architecture technique ---------------------
+\chapter{Résultats et architecture technique}
+\label{chap:resultats}
+\btpIntro{C}{e chapitre présente la plateforme développée, son architecture
+technique et les résultats obtenus. Nous détaillons les composants retenus,
+mesurons les performances d'ingestion, de recherche et de génération, puis
+comparons les approches candidates. La discussion met en regard les forces du
+système, ses limites actuelles et les pistes d'amélioration identifiées.}
+
+\input{sections/ch03_01_plateforme}
+\input{sections/ch03_02_architecture_technique}
+\input{sections/ch03_03_performances}
+\input{sections/ch03_04_analyse_comparative}
+\input{sections/ch03_05_discussion}
+
+% =============================================================================
+% PARTIES FINALES
+% =============================================================================
+\input{sections/90_conclusion}
+\input{sections/99_bibliographie}
+
+\appendix
+\input{sections/95_annexes}
+
+\end{document}

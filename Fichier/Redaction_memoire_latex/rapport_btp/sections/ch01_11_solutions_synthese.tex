@@ -1,0 +1,108 @@
+% =============================================================================
+% 1.11 Solutions existantes et synthèse de l'état de l'art
+% =============================================================================
+\section{Solutions existantes et synthèse}
+\label{sec:ch1-solutions}
+
+\subsection{Solutions du marché}
+
+Le marché de la gestion des appels d'offres et de la gestion de projet BTP
+propose plusieurs familles d'outils. Le tableau~\ref{tab:solutions-marche}
+en donne un aperçu représentatif, sans prétendre à l'exhaustivité.
+
+\begin{btptable}{Familles de solutions existantes}
+\label{tab:solutions-marche}
+\begin{tabularx}{\linewidth}{@{}L{2.8cm} Y C{1.6cm} C{2.0cm}@{}}
+\toprule
+\rowcolor{btppale}
+\btpth{Famille} & \btpth{Fonctionnalités typiques} & \btpth{IA générative} & \btpth{Capitalisation} \\
+\midrule
+Gestion d'appels d'offres & Suivi des consultations, collaboration, modèles de réponse. & Limitée & Passive \\
+Gestion de projet BTP & Planning, coûts, documents de chantier. & Absente & Passive \\
+Veille des marchés publics & Détection d'opportunités, alertes. & Absente & Sans objet \\
+GED généraliste & Archivage, circuits, recherche plein texte. & Émergente & Passive \\
+\bottomrule
+\end{tabularx}
+\end{btptable}
+
+Ces solutions partagent quatre limites, déjà identifiées à la
+section~\ref{sec:ch1-ged} et que l'état de l'art technologique permet
+désormais d'adresser~: recherche sémantique absente ou rudimentaire,
+absence de modélisation des relations, capitalisation réduite à
+l'archivage, et génération automatique inexistante ou non sourcée.
+
+Aucune, à notre connaissance, n'articule dans un même système une ingestion
+structurelle des pièces d'un DAO, une recherche hybride sur un patrimoine
+d'entreprise, une génération section par section avec citations, et une
+supervision humaine obligatoire avant export --- le tout dans le cadre
+juridique des marchés publics camerounais.
+
+\subsection{Tendances émergentes}
+
+Quatre tendances se dessinent néanmoins dans la littérature et chez les
+éditeurs~:
+
+\begin{enumerate}
+  \item l'usage des grands modèles de langage pour produire un premier
+        brouillon de réponse~;
+  \item l'extraction automatique des exigences d'un dossier entrant~;
+  \item le RAG comme architecture d'aide à la rédaction, plutôt que comme
+        chatbot générique~;
+  \item l'orchestration de workflows couvrant le processus de bout en bout.
+\end{enumerate}
+
+Ces tendances confirment la pertinence de notre problématique. Elles en
+confirment aussi le risque~: une génération non contrainte, sans citation
+ni revue, n'est pas une aide, c'est un nouveau vecteur d'irrégularité.
+
+\subsection{Synthèse de l'état de l'art}
+
+Le tableau~\ref{tab:synthese-eoa} croise la maturité des domaines parcourus
+et leur pertinence pour la réponse aux appels d'offres.
+
+\begin{btptable}{Maturité des domaines et pertinence pour les appels d'offres}
+\label{tab:synthese-eoa}
+\begin{tabularx}{\linewidth}{@{}L{4.4cm} C{3.0cm} Y@{}}
+\toprule
+\rowcolor{btppale}
+\btpth{Domaine} & \btpth{Maturité} & \btpth{Pertinence} \\
+\midrule
+Traitement automatique du langage & \btpMature & Très élevée \\
+Grands modèles de langage & \btpMature{} (évolutive) & Très élevée \\
+Recherche d'information lexicale (BM25) & \btpMature & Très élevée \\
+Fusion de classements (RRF) & \btpMature & Très élevée \\
+Génération augmentée par récupération & \btpMature & Très élevée \\
+Bases vectorielles & \btpMature & Très élevée \\
+Compréhension de documents & \btpEnDev & Très élevée \\
+Résolution d'entités & \btpMature & Élevée \\
+Graphes de connaissances & \btpEnDev & Élevée en seconde phase \\
+Agents fondés sur les LLM & \btpEmergent & Ponctuelle, non centrale \\
+Supervision humaine dans la boucle & \btpMature & Constitutive \\
+\bottomrule
+\end{tabularx}
+\end{btptable}
+
+De ce panorama se dégagent cinq lacunes que le présent travail entend
+combler~:
+
+\begin{enumerate}
+  \item l'absence de solution intégrée couvrant le cycle analyse--rédaction
+        --validation--export d'un dossier d'offre~;
+  \item le manque de traçabilité des sources dans les approches génératives
+        existantes~;
+  \item une capitalisation encore passive, réduite à l'archivage~;
+  \item l'absence de supervision humaine comme étape obligatoire, et non
+        comme option~;
+  \item la non-adaptation au cadre juridique et documentaire des marchés
+        publics camerounais.
+\end{enumerate}
+
+\begin{btpbox}[Ce que le chapitre suivant doit trancher]
+L'état de l'art justifie une architecture de génération augmentée par
+récupération, adossée à une recherche hybride, à une ingestion
+structurelle et à une revue humaine. Il ne dit pas \emph{comment}
+articuler ces briques, ni selon quels critères les évaluer. C'est l'objet
+du chapitre~\ref{chap:methodologie}.
+\end{btpbox}
+
+\btpEndMark

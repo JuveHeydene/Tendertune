@@ -1,0 +1,62 @@
+% =============================================================================
+% 3.2 Architecture technique
+% =============================================================================
+\section{Architecture technique}
+\label{sec:ch3-technique}
+
+Ce chapitre nomme les composants qui incarnent les rôles définis en
+méthodologie. Le tableau~\ref{tab:composants} en donne la correspondance.
+
+\begin{btptable}{Correspondance rôles méthodologiques --- composants techniques}
+\label{tab:composants}
+\begin{tabularx}{\linewidth}{@{}L{4.0cm} Y L{3.6cm}@{}}
+\toprule
+\rowcolor{btppale}
+\btpth{Rôle} & \btpth{Composant} & \btpth{Justification brève} \\
+\midrule
+Interface applicative & FastAPI & Contrats HTTP explicites, validation Pydantic. \\
+File de travaux & ARQ et Redis & Ingestion asynchrone, reprises. \\
+Analyse de documents & Docling / PaddleOCR & Numérique vs numérisé. \\
+Indexation et recherche & LlamaIndex et Qdrant & Hybride dense et creux natif. \\
+Plongements & BGE-M3 & Mixte, multilingue, français inclus. \\
+Ré-ordonnancement & BGE-reranker-v2-m3 & Modèle croisé, couple (requête, extrait). \\
+Orchestration & LangGraph & Graphes d'étapes et interruptions HITL. \\
+Modèle de langage & Ollama (local) ou API & Exécution locale prioritaire. \\
+Faits métier & PostgreSQL & Versions, citations, revues. \\
+Fichiers & MinIO & Originaux et exports. \\
+Graphe (phase 5) & Neo4j & Reporté. \\
+\bottomrule
+\end{tabularx}
+\end{btptable}
+
+\subsection{Choix d'extraction documentaire}
+
+Deux outils coexistent, conformément à la bifurcation identifiée à la
+section~\ref{sec:ch1-documents}. Docling est retenu pour les PDF
+numériques, car il préserve titres, listes et tableaux. PaddleOCR, avec
+analyse de mise en page, est retenu pour les scans. Le basculement est
+automatique, fondé sur la détection d'une couche texte extractible.
+
+\subsection{Choix d'indexation}
+
+Qdrant est retenu pour trois propriétés alignées sur le cahier des charges
+de la section~\ref{sec:ch1-vecteurs}~: filtrage par métadonnées avant
+similarité, représentation mixte dense et creuse, identifiants stables
+rattachables aux extraits stockés dans PostgreSQL. BGE-M3 produit
+conjointement les deux représentations, ce qui évite d'entretenir deux
+modèles de plongement.
+
+\subsection{Choix d'orchestration}
+
+LangGraph est retenu parce qu'il expose nativement des graphes d'étapes
+interruptibles. Le point d'interruption de revue n'est pas un rappel
+applicatif greffé après coup~: il est un n\oe ud du graphe, ce qui
+garantit qu'aucune section n'est persistée comme approuvée sans décision
+humaine. LlamaIndex fournit les abstractions de récupération (enfants,
+parents, fusion, ré-ordonnancement) sans dicter l'orchestration.
+
+\begin{btpnote}[Substitutabilité]
+Ces choix sont des incarnations, pas des fondements. Remplacer Qdrant par
+un autre magasin hybride, ou Ollama par une API, ne change pas le
+workflow. C'est précisément le bénéfice de l'architecture en couches.
+\end{btpnote}

@@ -1,0 +1,70 @@
+% =============================================================================
+% 2.9 Planification et synthèse de la méthodologie
+% =============================================================================
+\section{Planification et synthèse}
+\label{sec:ch2-planification}
+
+\subsection{Phases de développement}
+
+Le développement s'organise en cinq phases, représentées à la
+figure~\ref{fig:phases}. Les quatre premières constituent le périmètre de
+la première version. La cinquième est optionnelle et conditionnée par les
+résultats des précédentes.
+
+\begin{figure}[htbp]
+  \centering
+  \resizebox{\linewidth}{!}{\input{figures/fig_phases.tex}}
+  \caption{Phasage du développement}
+  \label{fig:phases}
+\end{figure}
+
+\begin{description}
+  \item[Phase 1 --- Socle.] Infrastructure, schéma relationnel,
+        authentification, points d'entrée minimaux.
+  \item[Phase 2 --- Ingestion.] Analyse structurelle, reconnaissance
+        optique, découpage parent-enfant, indexation.
+  \item[Phase 3 --- Recherche hybride.] BM25, vecteurs denses, fusion,
+        ré-ordonnancement, construction de contexte.
+  \item[Phase 4 --- Workflow.] Orchestration, revue humaine, export,
+        interface.
+  \item[Phase 5 --- Graphe (optionnelle).] Extraction d'entités et de
+        relations, requêtes multi-sauts.
+\end{description}
+
+\subsection{Livrables}
+
+Les livrables attendus sont~: le code source testé, un environnement
+reproductible, une documentation technique (interface applicative et
+architecture), une documentation utilisateur, un jeu de test (documents et
+questions) et les rapports d'évaluation correspondant aux hypothèses H1
+à H5.
+
+\subsection{Synthèse de la méthodologie}
+
+La méthodologie se caractérise par une approche modulaire et incrémentale,
+une évaluation continue, une validation humaine constitutive, une
+traçabilité complète et une adaptabilité volontairement préservée. Les
+choix suivants sont particulièrement notables.
+
+\begin{btptable}{Choix méthodologiques et justifications}
+\label{tab:choix-methodo}
+\begin{tabularx}{\linewidth}{@{}L{4.2cm} Y@{}}
+\toprule
+\rowcolor{btppale}
+\btpth{Choix} & \btpth{Justification} \\
+\midrule
+Recherche hybride & Meilleur compromis entre termes exacts et concepts. \\
+Découpage parent-enfant & Recherche précise et contexte suffisant. \\
+Génération par section & Contrôle de qualité, citations, versions. \\
+Supervision humaine & Responsabilité, conformité, apprentissage. \\
+Workflow déterministe & Traçabilité, coûts bornés, auditabilité. \\
+Ingestion asynchrone & L'utilisateur n'attend pas l'indexation. \\
+Relationnel et vecteurs & Faits métier d'un côté, similarité de l'autre. \\
+\bottomrule
+\end{tabularx}
+\end{btptable}
+
+Le chapitre suivant incarne ces choix dans une plateforme, en nomme les
+composants, et en mesure les performances.
+
+\btpEndMark

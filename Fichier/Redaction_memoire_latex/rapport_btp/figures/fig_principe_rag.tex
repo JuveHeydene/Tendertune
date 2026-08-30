@@ -1,0 +1,29 @@
+% Principe général de la génération augmentée par récupération
+\begin{tikzpicture}[node distance=6mm and 11mm]
+
+  \node[btpboxstrong, text width=2.5cm] (q) {Question\\utilisateur};
+  \node[btpbox, text width=2.9cm, right=of q] (search)
+    {Moteur de\\recherche\\[-1pt]\btplabel{lexical, sémantique, hybride}};
+  \node[btpdb, right=of search, minimum width=2.3cm] (kb)
+    {Base de\\connaissances};
+  \node[btpbox, text width=2.9cm, below=16mm of search] (ctx)
+    {Contexte\\[-1pt]\btplabel{extraits pertinents numérotés}};
+  \node[btpbox, text width=2.5cm, left=of ctx] (prompt)
+    {Invite\\[-1pt]\btplabel{question + contexte + consignes}};
+  \node[btpboxalt, text width=2.9cm, right=of ctx] (llm)
+    {Modèle de\\langage};
+  \node[btpboxstrong, text width=2.7cm, below=14mm of llm] (rep)
+    {Réponse\\avec citations};
+
+  \draw[btparrow] (q) -- (search);
+  \draw[btparrow] (search) -- (kb);
+  \draw[btparrowlight] (kb.south) |- (ctx.east);
+  \draw[btparrow] (ctx) -- (prompt);
+  \draw[btparrow] (prompt.south) |- ($(rep.west)+(-0.7,0)$) -- (rep.west);
+  \draw[btparrow] (ctx) -- (llm);
+  \draw[btparrow] (llm) -- (rep);
+
+  \node[btplabel, below=1mm of rep, text width=6cm]
+    {Chaque affirmation est rattachable à un extrait source identifié};
+
+\end{tikzpicture}

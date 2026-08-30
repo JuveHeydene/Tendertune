@@ -1,0 +1,58 @@
+sequenceDiagram
+    autonumber
+    actor Rédacteur as Rédacteur<br/>(Utilisateur)
+    participant Client as Interface<br/>(Navigateur)
+    participant API as API / Passerelle
+    participant Orquestre as Orchestrateur<br/>(Gestion du workflow)
+    participant BaseRel as Base de Données<br/>Relationnelle
+    participant IndexVec as Base de Données<br/>Vectorielle
+    participant BaseGraphe as Base de Données<br/>Graphe
+    participant LLM as LLM<br/>(Génération & Extraction)
+
+    Rédacteur->>Client: 1. Demande la génération de la section "Références"
+    Client->>API: 2. POST /dossiers/{id}/generer-section {section_key: "references"}
+    API->>Orquestre: 3. Délègue la tâche à l'orchestrateur
+
+    Note over Orquestre, IndexVec: === PHASE DE RECHERCHE ===
+
+    Orquestre->>BaseRel: 4. 1. Récupère le contexte du dossier (tenant, DAO, etc.)
+    Orquestre->>BaseRel: 5. 2. Récupère les exigences obligatoires liées à la section
+    Orquestre->>Orquestre: 6. Construit la requête de recherche<br/>(avec filtres : tenant, rôles de documents, etc.)
+    
+    Orquestre->>IndexVec: 7. Effectue une recherche hybride (dense + lexicale)<br/>(parcours le patrimoine et les archives, exclut le DAO courant)
+    IndexVec->>Orquestre: 8. Retourne les chunks les plus pertinents (Top-K)
+    
+    Note over Orquestre, BaseGraphe: === ÉTAPE OPTIONNELLE : ENRICHISSEMENT PAR LE GRAPHE ===
+
+    alt Si la question est relationnelle
+        Orquestre->>BaseGraphe: 9. Interroge le graphe pour trouver des liens<br/>(ex: "projets similaires", "certifications détenues")
+        BaseGraphe->>Orquestre: 10. Retourne les entités et relations trouvées
+    end
+
+    Note over Orquestre, LLM: === PHASE DE VALIDATION ET GÉNÉRATION ===
+
+    Orquestre->>Orquestre: 11. Vérifie que les exigences obligatoires sont couvertes par les sources<br/>(Si non, alerte l'utilisateur ou continue sans certaines)
+    Orquestre->>Orquestre: 12. Construit un contexte structuré (prompt) avec :<br/>- Le plan de la section (titre, niveau)<br/>- Les chunks textuels (citations)<br/>- Les informations du graphe (si applicable)
+    
+    Orquestre->>LLM: 13. Appelle le LLM pour générer le contenu de la section<br/>(format contraint : JSON structuré)
+    LLM->>Orquestre: 14. Retourne le contenu (JSON) et les citations associées
+    
+    Orquestre->>Orquestre: 15. Valide le résultat :<br/>- Vérifie que les citations existent dans le contexte<br/>- Vérifie qu'il n'y a pas de titres non autorisés
+    Orquestre->>BaseRel: 16. Sauvegarde la nouvelle version (generations)<br/>(contenu JSON, citations, contexte, version)
+
+    Orquestre->>Orquestre: 17. Déclenche une interruption humaine (HITL)<br/>(La section passe en statut 'generated', en attente de revue)
+
+    Orquestre->>Client: 18. Retourne un aperçu de la section générée
+    Client->>Rédacteur: 19. Affiche la section pour révision
+
+    Note over Rédacteur, Orquestre: === REVUE HUMAINE ===
+
+    Rédacteur->>Client: 20. Approuve, modifie ou demande une régénération
+    Client->>API: 21. POST /reviews (action, commentaire)
+    API->>Orquestre: 22. Traite la décision humaine
+
+    alt Si action = "approuver"
+        Orquestre->>BaseRel: 23. Met à jour le statut de la section ('approuvée')
+    else Si action = "régénérer" (regen)
+        Orquestre->>Orquestre: 24. Relance la génération (étape 4) avec la nouvelle instruction
+    end

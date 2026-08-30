@@ -1,0 +1,85 @@
+% =============================================================================
+% Annexes
+% =============================================================================
+\chapter{Schéma de sortie d'une section}
+\label{annexe:schema}
+
+Le schéma ci-dessous est le contrat entre le générateur et le reste du
+système. Toute sortie qui s'en écarte est rejetée par la validation
+déterministe, avant même la revue humaine.
+
+\begin{lstlisting}[style=btpjson, caption={Contrat JSON d'une section générée}]
+{
+  "section_key": "memoire_technique",
+  "titre": "Memoire technique d'execution",
+  "blocs": [
+    {
+      "type": "paragraphe",
+      "texte": "La methode d'execution retenue s'appuie sur..."
+    },
+    {
+      "type": "liste",
+      "texte": "- Phase preparatoire\n- Phase chantier\n- Reception"
+    }
+  ],
+  "citations": ["chunk-001", "chunk-014", "chunk-027"],
+  "exigences_couvertes": ["ex-012", "ex-018"],
+  "abstentions": [
+    "Aucune reference patrimoniale superieure a 20 M EUR n'a ete trouvee."
+  ]
+}
+\end{lstlisting}
+
+Les champs \texttt{citations} et \texttt{exigences\_couvertes} sont des
+identifiants, jamais des libellés libres. C'est cette contrainte qui rend
+la citation auditable.
+
+\chapter{Protocole du jeu de référence}
+\label{annexe:golden}
+
+Le jeu de référence utilisé pour l'évaluation de la récupération
+comprend trente questions, réparties en trois familles.
+
+\begin{btptable}{Composition du jeu de référence}
+\begin{tabularx}{\linewidth}{@{}L{4.2cm} C{2.2cm} Y@{}}
+\toprule
+\rowcolor{btppale}
+\btpth{Famille} & \btpth{Nombre} & \btpth{Exemple} \\
+\midrule
+Terme exact / identifiant & 10 & « Que dit l'article 12.3 du CCAP~? » \\
+Concept métier paraphrasé & 10 & « Quelles sanctions en cas de retard~? » \\
+Question mixte            & 10 & « Quelles références en assainissement, norme ISO 14001~? » \\
+\bottomrule
+\end{tabularx}
+\end{btptable}
+
+Pour chaque question, deux à cinq extraits pertinents ont été identifiés
+manuellement par un praticien. Un extrait est jugé pertinent s'il
+contient une information nécessaire à une réponse complète, pas seulement
+s'il partage des mots avec la question.
+
+\chapter{Glossaire des pièces d'un dossier}
+\label{annexe:pieces}
+
+Ce glossaire complète le tableau~\ref{tab:pieces-dao}. Il n'a pas vocation
+à se substituer aux définitions réglementaires.
+
+\begin{description}[style=nextline, leftmargin=1.2em, labelindent=0pt, font=\bfseries\color{btpdeep}]
+  \item[Règlement de consultation.] Pièce qui fixe les règles du jeu~:
+        calendrier, modalités de remise, critères de jugement, pièces
+        exigées.
+  \item[CCAG.] Clauses administratives générales applicables à une
+        famille de marchés (travaux, fournitures, prestations
+        intellectuelles).
+  \item[CCAP.] Clauses administratives particulières au marché, qui
+        précisent ou dérogent au CCAG.
+  \item[CCTP.] Spécifications techniques de l'ouvrage ou de la
+        prestation.
+  \item[DPGF.] Décomposition du prix global et forfaitaire, tableau
+        structuré des coûts.
+  \item[BPU.] Bordereau des prix unitaires, utilisé notamment dans les
+        marchés à prix unitaires.
+\end{description}
+
+\btpEndMark
+\clearpage

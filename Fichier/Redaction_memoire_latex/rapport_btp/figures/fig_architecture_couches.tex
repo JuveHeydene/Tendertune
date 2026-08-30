@@ -1,0 +1,42 @@
+% Architecture en couches de la plateforme
+\begin{tikzpicture}[node distance=4mm]
+
+  \newcommand{\layerw}{12.4cm}
+
+  \node[btptitleband, text width=\layerw, fill=btpdeep] (l1)
+    {Couche présentation};
+  \node[btpboxplain, text width=\layerw, below=1.5mm of l1, align=left, font=\scriptsize]
+    (c1) {Interface web~: dépôt de documents, conversation, revue des sections
+           générées, export des livrables};
+
+  \node[btptitleband, text width=\layerw, fill=btpblue, below=of c1] (l2)
+    {Couche service et orchestration};
+  \node[btpboxplain, text width=\layerw, below=1.5mm of l2, align=left, font=\scriptsize]
+    (c2) {Interface applicative HTTP, authentification et cloisonnement par
+           organisation, routage des intentions, machine à états du workflow,
+           points d'interruption pour la supervision humaine};
+
+  \node[btptitleband, text width=\layerw, fill=btpsky, below=of c2] (l3)
+    {Couche traitement};
+  \node[btpboxplain, text width=\layerw, below=1.5mm of l3, align=left, font=\scriptsize]
+    (c3) {Analyse structurelle des documents et reconnaissance optique,
+           découpage hiérarchique, calcul des plongements, recherche hybride,
+           ré-ordonnancement, extraction d'exigences, génération contrainte};
+
+  \node[btptitleband, text width=\layerw, fill=btplight, text=btpdeep, below=of c3] (l4)
+    {Couche persistance};
+  \node[btpboxplain, text width=\layerw, below=1.5mm of l4, align=left, font=\scriptsize]
+    (c4) {Base relationnelle (métadonnées, extraits, exigences, versions,
+           décisions), index vectoriel (dense et creux), stockage objet
+           (fichiers d'origine et exports), file de travaux};
+
+  \node[btptitleband, text width=\layerw, fill=btpslate, below=of c4] (l5)
+    {Couche infrastructure};
+  \node[btpboxplain, text width=\layerw, below=1.5mm of l5, align=left, font=\scriptsize]
+    (c5) {Conteneurisation des services, journalisation structurée,
+           supervision des métriques, sauvegardes};
+
+  \draw[btparrow, line width=1.4pt] ($(l1.west)+(-0.4,0)$) -- ($(c5.west)+(-0.4,0)$)
+    node[midway, rotate=90, anchor=south, btplabel, yshift=1pt] {Descente des appels};
+
+\end{tikzpicture}

@@ -1,0 +1,35 @@
+% Chaîne d'ingestion documentaire
+\begin{tikzpicture}[node distance=5mm and 9mm]
+
+  \node[btpboxstrong, text width=2.1cm] (up) {Dépôt du\\fichier};
+  \node[btpdb, right=of up, minimum width=2.0cm] (obj) {Stockage\\objet};
+  \node[btpbox, text width=2.3cm, right=of obj] (detect)
+    {Détection\\du type\\[-1pt]\btplabel{numérique / numérisé}};
+
+  \node[btpbox, text width=2.5cm, above right=4mm and 9mm of detect] (parse1)
+    {Analyse\\structurelle\\[-1pt]\btplabel{PDF numérique}};
+  \node[btpbox, text width=2.5cm, below right=4mm and 9mm of detect] (parse2)
+    {Reconnaissance\\optique\\[-1pt]\btplabel{document numérisé}};
+
+  \node[btpbox, text width=2.4cm, right=9mm of {$(parse1)!0.5!(parse2)$}] (chunk)
+    {Découpage\\hiérarchique};
+  \node[btpboxalt, text width=2.3cm, below=14mm of chunk] (embed)
+    {Calcul des\\plongements};
+  \node[btpdb, left=12mm of embed, minimum width=2.1cm] (vec) {Index\\vectoriel};
+  \node[btpdb, right=12mm of embed, minimum width=2.3cm] (sql) {Base\\relationnelle};
+
+  \draw[btparrow] (up) -- (obj);
+  \draw[btparrow] (obj) -- (detect);
+  \draw[btparrow] (detect) -- (parse1);
+  \draw[btparrow] (detect) -- (parse2);
+  \draw[btparrow] (parse1) -- (chunk);
+  \draw[btparrow] (parse2) -- (chunk);
+  \draw[btparrow] (chunk) -- (embed);
+  \draw[btparrow] (embed) -- (vec);
+  \draw[btparrow] (embed) -- (sql);
+
+  \node[btplabel, below=4mm of embed, text width=9.5cm]
+    {Le statut du document passe de « en attente » à « prêt » seulement
+     lorsque l'indexation est confirmée dans les deux magasins};
+
+\end{tikzpicture}

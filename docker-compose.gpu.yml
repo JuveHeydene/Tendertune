@@ -1,0 +1,16 @@
+# Overlay GPU — uniquement si USE_GPU=true + NVIDIA + nvidia-container-toolkit.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml --profile dev up -d
+
+services:
+  worker:
+    environment:
+      USE_GPU: "true"
+      NVIDIA_VISIBLE_DEVICES: all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

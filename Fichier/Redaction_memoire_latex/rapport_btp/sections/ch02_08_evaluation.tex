@@ -1,0 +1,68 @@
+% =============================================================================
+% 2.8 Stratégie d'évaluation et de validation
+% =============================================================================
+\section{Stratégie d'évaluation et de validation}
+\label{sec:ch2-evaluation}
+
+\subsection{Évaluation de la récupération}
+
+L'évaluation du moteur de recherche s'appuie sur un jeu de référence
+(\anglais{golden set}) de trente questions, dont les extraits pertinents
+auront été identifiés manuellement par des praticiens. Les métriques
+retenues sont le rappel à 20, la précision à 5 et le rang réciproque
+moyen.
+
+Quatre configurations seront comparées~: recherche dense seule, BM25 seul,
+hybride par fusion de rangs, hybride suivi d'un ré-ordonnancement. Les
+seuils d'interprétation sont les suivants~: un rappel à 20 inférieur à
+$0{,}70$ signale un problème d'ingestion ou de découpage~; un rappel
+supérieur à $0{,}80$ indique un système opérationnel.
+
+\subsection{Évaluation de la génération}
+
+L'évaluation de la génération est confiée à des experts du domaine, sur
+un dossier de test. Chaque section est notée selon quatre critères~:
+fidélité au contexte, ancrage des affirmations, exhaustivité au regard
+des exigences, exactitude factuelle. Un protocole complémentaire, de type
+modèle juge (RAGAS), accélère l'itération mais ne substitue pas le
+jugement expert.
+
+Les seuils d'alerte sont une fidélité inférieure à $0{,}80$ (problème de
+contexte ou d'invite) et un ancrage inférieur à $0{,}70$ (problème de
+citation).
+
+\subsection{Validation des hypothèses}
+
+Les hypothèses H1 à H5, formulées en introduction générale, se traduisent
+en comparaisons contrôlées.
+
+\begin{btptable}{Validation empirique des hypothèses}
+\label{tab:validation-h}
+\begin{tabularx}{\linewidth}{@{}C{1.1cm} Y L{3.8cm} C{1.8cm}@{}}
+\toprule
+\rowcolor{btppale}
+\btpth{Réf.} & \btpth{Énoncé opérationnel} & \btpth{Comparaison} & \btpth{Gain visé} \\
+\midrule
+H1 & La recherche hybride surpasse la recherche dense seule. & Rappel à 20 & $+10$\,\% \\
+H2 & Le découpage parent-enfant surpasse la fenêtre fixe. & Ancrage et exhaustivité & $+15$\,\% \\
+H3 & Le ré-ordonnancement surpasse la seule fusion de rangs. & Précision à 5 & $+20$\,\% \\
+H4 & La génération par section surpasse la génération globale. & Couverture des exigences & $+25$\,\% \\
+H5 & La revue humaine améliore la fiabilité sans annuler le gain. & Taux de validation, temps de cycle & $+30$\,\% \\
+\bottomrule
+\end{tabularx}
+\end{btptable}
+
+\subsection{Robustesse}
+
+Cinq dispositifs bornent le comportement du système en cas de défaillance.
+
+\begin{enumerate}
+  \item des validations déterministes avant et après chaque appel au
+        modèle~;
+  \item des reprises bornées (deux essais au plus) avant interruption
+        humaine~;
+  \item des délais d'expiration sur les travaux longs, avec arrêt propre~;
+  \item des transactions pour la cohérence des écritures duales (relationnel
+        et vectoriel)~;
+  \item des journaux structurés, exploitables pour l'audit et le diagnostic.
+\end{enumerate}

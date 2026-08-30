@@ -1,0 +1,96 @@
+% =============================================================================
+% 2.3 Analyse des besoins et spécification
+% =============================================================================
+\section{Analyse des besoins et spécification}
+\label{sec:ch2-besoins}
+
+\subsection{Besoins fonctionnels}
+
+L'analyse des besoins a été menée en collaboration avec des praticiens du
+domaine des appels d'offres au sein de SITINFRA Cameroun. Elle a permis
+d'identifier les besoins fonctionnels du tableau~\ref{tab:besoins-f}.
+
+\begin{btptable}{Besoins fonctionnels}
+\label{tab:besoins-f}
+\begin{tabularx}{\linewidth}{@{}C{1.1cm} L{3.6cm} C{2.0cm} Y@{}}
+\toprule
+\rowcolor{btppale}
+\btpth{Id.} & \btpth{Besoin} & \btpth{Priorité} & \btpth{Description} \\
+\midrule
+BF1  & Ingestion de documents     & Haute    & Dépôt de fichiers (PDF, DOCX, tableurs, scans). \\
+BF2  & Indexation                 & Haute    & Indexation sémantique et lexicale des extraits. \\
+BF3  & Recherche                  & Haute    & Recherche hybride, filtrée par organisation et type. \\
+BF4  & Extraction d'exigences     & Haute    & Extraction structurée des exigences du DAO. \\
+BF5  & Génération de sections     & Haute    & Rédaction assistée d'une section, avec citations. \\
+BF6  & Validation humaine         & Haute    & Revue, correction ou relance avant intégration. \\
+BF7  & Export                     & Moyenne  & Assemblage et export du dossier final. \\
+BF8  & Graphe de connaissances    & Basse    & Liens entre entités (seconde phase). \\
+BF9  & Cloisonnement              & Moyenne  & Isolation des données par organisation. \\
+BF10 & Historique                 & Moyenne  & Versions des sections et trace des décisions. \\
+\bottomrule
+\end{tabularx}
+\end{btptable}
+
+\subsection{Besoins non fonctionnels}
+
+\begin{btptable}{Besoins non fonctionnels}
+\label{tab:besoins-nf}
+\begin{tabularx}{\linewidth}{@{}C{1.3cm} L{2.8cm} Y@{}}
+\toprule
+\rowcolor{btppale}
+\btpth{Id.} & \btpth{Besoin} & \btpth{Description} \\
+\midrule
+BNF1 & Performance     & Temps de réponse inférieur à cinq secondes pour une recherche. \\
+BNF2 & Fiabilité       & Taux d'erreur opérationnelle inférieur à un pour cent. \\
+BNF3 & Sécurité        & Authentification, cloisonnement strict des corpus. \\
+BNF4 & Traçabilité     & Chaque génération est rattachée à des sources et à une version. \\
+BNF5 & Évolutivité     & Architecture modulaire, ajout de briques sans rupture. \\
+BNF6 & Maintenabilité  & Code structuré, documenté, couvert par des tests. \\
+\bottomrule
+\end{tabularx}
+\end{btptable}
+
+\subsection{Spécifications fonctionnelles}
+
+\paragraph{Ingestion et indexation (BF1, BF2).}
+Le dépôt d'un fichier via l'interface web déclenche une détection du type
+(numérique ou numérisé), une extraction préservant titres et tableaux, un
+découpage hiérarchique parent-enfant, puis une indexation conjointe dans
+un magasin vectoriel et une base relationnelle. Le document n'est marqué
+« prêt » que lorsque les deux magasins ont confirmé l'écriture.
+
+\paragraph{Extraction d'exigences (BF4).}
+Le dossier d'appel d'offres courant est analysé pour en extraire les
+exigences --- catégorie, caractère obligatoire, pièce source --- stockées
+en base relationnelle et liées au dossier en cours. Cette extraction est
+contrainte par un schéma~: le modèle ne produit pas un texte, il produit
+des enregistrements validables.
+
+\paragraph{Génération de sections (BF5, BF6).}
+Un plan est d'abord construit à partir du dossier entrant. Pour chaque
+section, le système construit une requête, récupère un contexte, génère
+une sortie structurée, la valide automatiquement, puis s'interrompt pour
+la revue humaine. Aucune section n'est intégrée au livrable sans décision
+explicite.
+
+\subsection{Critères d'évaluation}
+
+Les critères du tableau~\ref{tab:criteres-eval} seront utilisés au
+chapitre~\ref{chap:resultats} pour valider le système. Ils dérivent des
+hypothèses H1 à H5 formulées en introduction générale.
+
+\begin{btptable}{Critères d'évaluation et cibles}
+\label{tab:criteres-eval}
+\begin{tabularx}{\linewidth}{@{}L{3.4cm} Y C{2.6cm}@{}}
+\toprule
+\rowcolor{btppale}
+\btpth{Critère} & \btpth{Mesure} & \btpth{Cible} \\
+\midrule
+Rappel à 20        & Proportion d'extraits pertinents dans les vingt premiers. & $> 0{,}75$ \\
+Fidélité           & Proportion d'affirmations fondées sur le contexte. & $> 0{,}85$ \\
+Temps d'ingestion  & Document numérique de cinquante pages. & $< 60$\,s \\
+Temps de génération & Une section, hors revue humaine. & $< 30$\,s \\
+Taux de validation & Sections approuvées sans modification. & $> 70$\,\% \\
+\bottomrule
+\end{tabularx}
+\end{btptable}

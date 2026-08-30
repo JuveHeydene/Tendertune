@@ -1,0 +1,121 @@
+% =============================================================================
+% 1.9 Correspondance approximative, résolution d'entités et graphes
+% =============================================================================
+\section{Résolution d'entités et graphes de connaissances}
+\label{sec:ch1-entites}
+
+\subsection{Correspondance approximative}
+
+La correspondance approximative (\anglais{fuzzy matching}) désigne l'ensemble
+des techniques permettant de comparer des chaînes malgré des variations
+orthographiques, des fautes de frappe ou des artefacts d'OCR. Elle
+s'inscrit dans un héritage ancien --- la distance d'édition de Levenshtein
+(1965), les codes phonétiques de type Soundex, les coefficients de Jaccard
+et les $n$-grammes --- et demeure indispensable dès que l'on traite des
+textes produits par des humains ou par une reconnaissance optique imparfaite.
+
+\begin{btptable}{Méthodes fondamentales de correspondance approximative}
+\label{tab:fuzzy}
+\begin{tabularx}{\linewidth}{@{}L{2.8cm} Y L{3.6cm}@{}}
+\toprule
+\rowcolor{btppale}
+\btpth{Méthode} & \btpth{Principe} & \btpth{Application typique} \\
+\midrule
+Levenshtein & Nombre d'insertions, suppressions et substitutions. & Fautes, artefacts d'OCR. \\
+Jaccard & Intersection sur union d'ensembles de tokens. & Ordre des mots secondaire. \\
+$n$-grammes & Partage de sous-séquences de $n$ caractères. & Texte long, OCR. \\
+Soundex et variantes & Encodage phonétique. & Noms propres (limité en français). \\
+\bottomrule
+\end{tabularx}
+\end{btptable}
+
+\subsection{Résolution d'entités}
+
+La résolution d'entités consiste à décider que deux libellés désignent la
+même entité réelle. Elle s'appuie sur la correspondance approximative, mais
+l'intègre dans un processus~: normalisation (casse, accents, formes
+juridiques), comparaison, seuillage, et, en cas de doute, arbitrage humain.
+
+La figure~\ref{fig:resolution-entites} en illustre le déroulement sur deux
+dénominations d'une même entreprise.
+
+\begin{figure}[htbp]
+  \centering
+  \resizebox{0.92\linewidth}{!}{\input{figures/fig_resolution_entites.tex}}
+  \caption{Chaîne de résolution d'entités}
+  \label{fig:resolution-entites}
+\end{figure}
+
+Dans un corpus d'appels d'offres, les entités récurrentes sont nombreuses
+et leurs dénominations instables~:
+
+\begin{itemize}
+  \item \btpterm{Entreprises}~: « SITINFRA », « Sitinfra Cameroun »,
+        « SITINFRA Sarl »~;
+  \item \btpterm{Projets}~: un même ouvrage désigné par son lieu, son maître
+        d'ouvrage ou son acronyme interne~;
+  \item \btpterm{Certifications}~: « ISO 9001 » et « ISO 9001:2015 »~;
+  \item \btpterm{Personnes}~: variations d'état civil, de titre et d'ordre
+        des noms.
+\end{itemize}
+
+Sans résolution, le système crée des doublons, manque des rapprochements
+et, le cas échéant, peuple un graphe de n\oe uds redondants. Avec une
+résolution trop agressive, il fusionne des entités distinctes. Le seuil
+et l'arbitrage humain ne sont donc pas des raffinements~: ils sont
+constitutifs de la méthode.
+
+\subsection{Graphes de connaissances}
+
+Un graphe de connaissances représente les entités comme des n\oe uds et
+les relations comme des arêtes typées. La figure~\ref{fig:graphe}
+en donne une instance schématique pour le domaine des appels d'offres.
+
+\begin{figure}[htbp]
+  \centering
+  \resizebox{\linewidth}{!}{\input{figures/fig_graphe_connaissances.tex}}
+  \caption{Principe d'un graphe de connaissances appliqué aux appels d'offres}
+  \label{fig:graphe}
+\end{figure}
+
+Quatre familles de questions, mal servies par une recherche textuelle,
+deviennent formulables~:
+
+\begin{enumerate}
+  \item \btpterm{Traçabilité des compétences}~: quels ingénieurs ont
+        travaillé sur des projets comparables~?
+  \item \btpterm{Conformité relationnelle}~: quelles certifications
+        couvrent quelles exigences du règlement de consultation~?
+  \item \btpterm{Analyse transverse}~: quels maîtres d'ouvrage ont déjà
+        attribué des marchés à l'entreprise~?
+  \item \btpterm{Capitalisation des relations}~: projets, clients,
+        équipements et compétences deviennent des chemins navigables.
+\end{enumerate}
+
+L'extraction automatique de tels graphes à partir de textes non structurés
+reste toutefois un défi ouvert, résumé au tableau~\ref{tab:defis-graphe}.
+
+\begin{btptable}{Défis de l'extraction de graphes de connaissances}
+\label{tab:defis-graphe}
+\begin{tabularx}{\linewidth}{@{}L{3.4cm} Y Y@{}}
+\toprule
+\rowcolor{btppale}
+\btpth{Défi} & \btpth{Description} & \btpth{Piste} \\
+\midrule
+Résolution d'entités & Une même entité sous des formes variées. & Normalisation et correspondance approximative. \\
+Extraction de relations & Identifier le type et le sens d'un lien. & Modèle contraint, schéma prédéfini. \\
+Évolution & Le graphe doit s'enrichir sans se corrompre. & Fusion incrémentale, versions. \\
+Évaluation & Mesurer l'exactitude des triplets extraits. & Validation humaine par échantillon. \\
+\bottomrule
+\end{tabularx}
+\end{btptable}
+
+\begin{btpwarn}[Positionnement]
+Le graphe de connaissances n'est pas un prérequis de la première version
+d'un système de génération d'offres. Il devient pertinent lorsque les
+questions relationnelles multi-sauts constituent un besoin avéré, et
+lorsque le corpus est suffisamment propre pour que l'extraction ne
+produise pas plus de bruit que de signal. Nous le traitons donc comme une
+perspective de seconde phase, et non comme un fondement de l'architecture
+initiale.
+\end{btpwarn}

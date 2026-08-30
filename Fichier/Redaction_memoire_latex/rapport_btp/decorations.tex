@@ -1,0 +1,223 @@
+% =============================================================================
+% decorations.tex — Ornements du mémoire (palette bleu clair)
+%
+% Style : ornements gravés « vectorian » (pgfornament), déclinés en bleu clair.
+% Inspiré des mémoires classiques à cadre ornemental, avec un vocabulaire
+% graphique propre : cadre à double filet + coins fleuronnés + bandeau répété,
+% filets à fleuron pour les chapitres et les sections.
+%
+% Toutes les commandes publiques sont préfixées \btp...
+% =============================================================================
+
+\usepackage{tikz}
+\usetikzlibrary{calc}
+\usepackage{pgfornament}
+\usepackage{eso-pic}
+\usepackage{lettrine}
+
+% -----------------------------------------------------------------------------
+% Palette — couleur principale #3B5D9C
+% Les teintes d'ornement (ciel, clair, pâle, profond) sont mélangées
+% à partir de btpblue, pour que cadres, filets et fleurons restent
+% dans la même famille.
+% -----------------------------------------------------------------------------
+\definecolor{btpblue}{HTML}{3B5D9C}           % bleu principal
+\colorlet{btpsky}{btpblue!58!white}           % accent (filet intérieur, volutes)
+\colorlet{btplight}{btpblue!30!white}          % filets, pieds de page
+\colorlet{btppale}{btpblue!10!white}           % fonds d'encadrés et tableaux
+\colorlet{btpdeep}{btpblue!58!black}           % titres, numéros de chapitre
+\definecolor{btpslate}{RGB}{70, 82, 108}      % gris-bleu (texte secondaire)
+\definecolor{btpink}{RGB}{26, 34, 43}          % encre du corps de texte
+\definecolor{btpgold}{RGB}{168, 138, 82}      % rehaut discret, accordé au royal
+
+% Alias de compatibilité
+\colorlet{maindeco}{btpblue}
+\colorlet{decoSlate}{btpslate}
+\colorlet{btpaccent}{btpsky}
+
+% -----------------------------------------------------------------------------
+% Numéros des ornements vectorian retenus
+% (redéfinissables pour changer tout le vocabulaire graphique d'un coup)
+% -----------------------------------------------------------------------------
+\newcommand{\btpOrnCorner}{63}   % coin fleuronné (page de garde)
+\newcommand{\btpOrnCornerLight}{41} % coin à volute (pages courantes)
+\newcommand{\btpOrnBand}{88}     % filet fin (bandeaux de cadre)
+\newcommand{\btpOrnRule}{85}     % filet à fleuron central (séparateurs)
+\newcommand{\btpOrnFlourish}{46} % volute horizontale (chapitres)
+\newcommand{\btpOrnSmall}{80}    % petit motif (en-têtes, pieds de page)
+\newcommand{\btpOrnLeaf}{75}     % fleuron feuillu (titres liminaires)
+
+% -----------------------------------------------------------------------------
+% Séparateurs horizontaux
+% -----------------------------------------------------------------------------
+% \btpRule[largeur][couleur] : séparateur centré à fleuron
+\newcommand{\btpRule}[2][0.55\linewidth]{%
+  \begingroup
+  \centering
+  \pgfornament[width=#1, color=#2]{\btpOrnRule}%
+  \par
+  \endgroup
+}
+
+% Séparateur de section : volute fine sous le titre
+\newcommand{\btpSectionRule}{%
+  \vspace{-0.35\baselineskip}%
+  \noindent
+  \textcolor{btplight}{\rule{\linewidth}{0.9pt}}%
+  \par\vspace{-0.55\baselineskip}%
+  \noindent
+  \textcolor{btpblue}{\rule{0.22\linewidth}{2.2pt}}%
+  \par\vspace{0.35\baselineskip}%
+}
+
+% Fleuron de fin de partie
+\newcommand{\btpEndMark}{%
+  \par\vspace{0.8em}
+  \begin{center}
+    \pgfornament[width=3.4cm, color=btpsky]{\btpOrnSmall}
+  \end{center}
+  \vspace{0.4em}
+}
+
+% Fleuron large pour les pages liminaires
+\newcommand{\btpLiminaryRule}{%
+  \begin{center}
+    \pgfornament[width=4.6cm, color=btpblue]{\btpOrnFlourish}
+  \end{center}
+}
+
+% -----------------------------------------------------------------------------
+% Cadre ornemental de la page de garde
+% -----------------------------------------------------------------------------
+% Double filet + bandeau d'ornements répétés + coins fleuronnés.
+% \btpCoverFrame  : à appeler dans l'environnement titlepage.
+\newcommand{\btpCoverFrame}{%
+  \AddToShipoutPictureFG*{%
+    \begin{tikzpicture}[remember picture, overlay]
+      % --- filets ---
+      \draw[btpblue, line width=1.5pt]
+        ($(current page.south west)+(1.15cm,1.15cm)$)
+        rectangle
+        ($(current page.north east)+(-1.15cm,-1.15cm)$);
+      \draw[btpblue!70!white, line width=0.55pt]
+        ($(current page.south west)+(1.42cm,1.42cm)$)
+        rectangle
+        ($(current page.north east)+(-1.42cm,-1.42cm)$);
+      % --- bandeaux d'ornements répétés (haut / bas) ---
+      \pgfornamentline[color=btpblue!62!white]
+        {$(current page.north west)+(2.6cm,-1.285cm)$}
+        {$(current page.north east)+(-2.6cm,-1.285cm)$}{9}{\btpOrnBand}
+      \pgfornamentline[color=btpblue!62!white]
+        {$(current page.south west)+(2.6cm,1.285cm)$}
+        {$(current page.south east)+(-2.6cm,1.285cm)$}{9}{\btpOrnBand}
+      % --- coins fleuronnés ---
+      \node[anchor=north west, inner sep=0] at ($(current page.north west)+(1.18cm,-1.18cm)$)
+        {\pgfornament[width=2.35cm, color=btpblue]{\btpOrnCorner}};
+      \node[anchor=north east, inner sep=0] at ($(current page.north east)+(-1.18cm,-1.18cm)$)
+        {\pgfornament[width=2.35cm, color=btpblue, symmetry=v]{\btpOrnCorner}};
+      \node[anchor=south west, inner sep=0] at ($(current page.south west)+(1.18cm,1.18cm)$)
+        {\pgfornament[width=2.35cm, color=btpblue, symmetry=h]{\btpOrnCorner}};
+      \node[anchor=south east, inner sep=0] at ($(current page.south east)+(-1.18cm,1.18cm)$)
+        {\pgfornament[width=2.35cm, color=btpblue, symmetry=c]{\btpOrnCorner}};
+    \end{tikzpicture}%
+  }%
+}
+
+% Cadre allégé pour la page de titre intérieure et les pages liminaires fortes
+\newcommand{\btpLightFrame}{%
+  \AddToShipoutPictureFG*{%
+    \begin{tikzpicture}[remember picture, overlay]
+      \draw[btpblue!38!white, line width=0.9pt]
+        ($(current page.south west)+(1.3cm,1.3cm)$)
+        rectangle
+        ($(current page.north east)+(-1.3cm,-1.3cm)$);
+      \node[anchor=north west, inner sep=0] at ($(current page.north west)+(1.33cm,-1.33cm)$)
+        {\pgfornament[width=1.5cm, color=btpblue]{\btpOrnCornerLight}};
+      \node[anchor=south east, inner sep=0] at ($(current page.south east)+(-1.33cm,1.33cm)$)
+        {\pgfornament[width=1.5cm, color=btpblue, symmetry=c]{\btpOrnCornerLight}};
+    \end{tikzpicture}%
+  }%
+}
+
+% -----------------------------------------------------------------------------
+% Décor optionnel des pages courantes : filet dans la marge extérieure
+% Le décor principal des pages courantes est porté par l'en-tête et le pied
+% de page (voir preamble.tex) ; ce filet est un supplément facultatif.
+% -----------------------------------------------------------------------------
+\newcommand{\btpEnableMarginRule}{%
+  \AddToShipoutPictureBG{%
+    \begin{tikzpicture}[remember picture, overlay]
+      \draw[btplight, line width=2.2pt]
+        ($(current page.north east)+(-1.15cm,-2.6cm)$) --
+        ($(current page.south east)+(-1.15cm,2.6cm)$);
+    \end{tikzpicture}%
+  }%
+}
+
+% Conservé pour compatibilité : n'active plus le filet latéral.
+\newcommand{\btpEnablePageDecor}{}
+
+% -----------------------------------------------------------------------------
+% Ouverture de chapitre
+% -----------------------------------------------------------------------------
+% Bloc bleu clair portant le numéro, mention verticale « CHAPITRE »,
+% titre en petites capitales, filet à volute.
+\newcommand{\btpChapterLabel}{Chapitre}
+
+\newcommand{\btpChapterNumberBlock}[1]{%
+  \begin{tikzpicture}[baseline=(blk.center)]
+    \node[
+      draw=btpblue, line width=1pt,
+      fill=btppale,
+      rounded corners=1.5pt,
+      minimum width=2.05cm, minimum height=2.05cm,
+      inner sep=0pt
+    ] (blk) {\fontsize{46}{46}\selectfont\bfseries\color{btpdeep}#1};
+    \node[
+      rotate=90, anchor=south,
+      font=\scriptsize\bfseries\scshape,
+      text=btpblue,
+      inner sep=3pt
+    ] at (blk.west) {\btpChapterLabel};
+  \end{tikzpicture}%
+}
+
+% -----------------------------------------------------------------------------
+% Paragraphe d'accroche de chapitre (lettrine)
+% -----------------------------------------------------------------------------
+\setlength{\DefaultFindent}{2pt}
+\renewcommand{\LettrineFontHook}{\color{btpblue}}
+
+% \btpIntro{D}{ans ce chapitre, ...}
+%   #1 : lettre initiale (mise en lettrine)
+%   #2 : suite du paragraphe d'accroche
+\newcommand{\btpIntro}[2]{%
+  \begingroup
+  \itshape
+  \lettrine[lines=3, lhang=0.14, loversize=0.05, findent=3pt, nindent=0pt]%
+    {#1}{}#2%
+  \par
+  \endgroup
+  \vspace{0.6em}
+  \noindent
+  \hbox to \linewidth{\hfil\pgfornament[width=3cm, color=btplight]{\btpOrnSmall}\hfil}%
+  \par\vspace{0.5em}
+}
+
+% -----------------------------------------------------------------------------
+% Bandeau d'image de chapitre (optionnel)
+% -----------------------------------------------------------------------------
+\newcommand{\btpChapterBanner}[1]{%
+  \noindent
+  \begin{tikzpicture}
+    \clip[rounded corners=3pt]
+      (0,0) rectangle (\linewidth, 2.6cm);
+    \node[anchor=south west, inner sep=0] at (0,0)
+      {\includegraphics[width=\linewidth]{#1}};
+    \fill[btpblue, opacity=0.12] (0,0) rectangle (\linewidth, 2.6cm);
+  \end{tikzpicture}%
+  \par\vspace{0.4cm}%
+}
+
+% Alias documenté dans le README : placer juste avant \chapter{...}
+\newcommand{\setchapterimage}[1]{\btpChapterBanner{#1}}

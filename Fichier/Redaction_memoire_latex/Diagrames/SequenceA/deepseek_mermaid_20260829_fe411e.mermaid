@@ -1,0 +1,38 @@
+sequenceDiagram
+    autonumber
+    actor Rédacteur as Rédacteur<br/>(Utilisateur)
+    participant API as API / Passerelle
+    participant File as File d'Attente de Tâches
+    participant Worker as Worker d'Ingestion
+    participant SysCompr as Système de<br/>Compréhension Docs
+    participant BaseRel as Base Relationnelle
+    participant IndexVec as Index Vectoriel
+    participant BaseGraphe as Base Graphe
+
+    Rédacteur->>API: 1. Téléverse un document (DAO, référence, etc.)
+    API->>API: 2. Valide les droits d'accès et le tenant
+    API->>BaseRel: 3. Crée une ligne 'Document' (status: "en_attente")
+    API->>File: 4. Dépose une tâche "INGERER_DOCUMENT" (avec ID du document)
+    API->>Rédacteur: 5. Accusé de réception (ID du document)
+
+    Note over File, Worker: === TRAITEMENT ASYNCHRONE (HORLOGE A) ===
+
+    Worker->>File: 6. Récupère et consomme la tâche
+    Worker->>BaseRel: 7. Met à jour status du document: "en_cours"
+
+    Worker->>SysCompr: 8. Demande l'extraction du texte et de la structure
+    SysCompr->>Worker: 9. Retourne le contenu structuré (markdown, tables, titres)
+
+    Worker->>Worker: 10. Découpe en "chunks" sémantiques<br/>(avec hiérarchie parent/enfant)
+    Worker->>BaseRel: 11. Sauvegarde les chunks texte (contenu, page, titre)
+    Worker->>IndexVec: 12. Indexe les vecteurs des chunks
+
+    Worker->>BaseRel: 13. Met à jour status du document: "prêt"
+
+    Note over Worker, BaseGraphe: === EXTRACTION DU GRAPHE DE CONNAISSANCES (PHASE 1.5) ===
+
+    Worker->>BaseRel: 14. Charge les chunks parents du document
+    Worker->>Worker: 15. Pour chaque chunk parent :<br/>- Construit un prompt d'extraction<br/>- Appelle le LLM pour obtenir entités/relations (format JSON)
+    Worker->>Worker: 16. Résolution d'entités (exact, fuzzy, blocking)
+    Worker->>BaseGraphe: 17. Enregistre les entités et relations (MERGE)
+    Worker->>BaseRel: 18. Marque le document comme 'graphe_extrait' (true)

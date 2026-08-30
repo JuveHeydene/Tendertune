@@ -1,0 +1,148 @@
+\babel@toc {french}{}\relax 
+\contentsline {chapter}{Remerciements}{ii}{chapter*.1}%
+\contentsline {chapter}{Résumé}{iv}{chapter*.2}%
+\contentsline {chapter}{Abstract}{v}{chapter*.3}%
+\babel@toc {english}{}\relax 
+\babel@toc {french}{}\relax 
+\contentsline {chapter}{Liste des sigles et acronymes}{vi}{chapter*.4}%
+\contentsline {chapter}{Introduction générale}{1}{chapter*.5}%
+\contentsline {chapter}{\numberline {1}État de l'art}{4}{chapter.1}%
+\contentsline {section}{\numberline {1.1}Introduction}{4}{section.1.1}%
+\contentsline {section}{\numberline {1.2}Le contexte des appels d'offres dans le secteur du BTP}{5}{section.1.2}%
+\contentsline {subsection}{\numberline {1.2.1}Définition et cadre juridique}{5}{subsection.1.2.1}%
+\contentsline {subsection}{\numberline {1.2.2}Le processus de réponse aux appels d'offres}{6}{subsection.1.2.2}%
+\contentsline {subsection}{\numberline {1.2.3}Les enjeux de la capitalisation des connaissances}{7}{subsection.1.2.3}%
+\contentsline {section}{\numberline {1.3}Gestion documentaire et systèmes d'information dans le BTP}{8}{section.1.3}%
+\contentsline {subsection}{\numberline {1.3.1}Évolution des systèmes de gestion documentaire}{8}{subsection.1.3.1}%
+\contentsline {subsection}{\numberline {1.3.2}Standards et normes applicables}{9}{subsection.1.3.2}%
+\contentsline {subsection}{\numberline {1.3.3}Les limites des solutions actuelles}{9}{subsection.1.3.3}%
+\contentsline {section}{\numberline {1.4}Intelligence artificielle et traitement automatique du langage}{10}{section.1.4}%
+\contentsline {subsection}{\numberline {1.4.1}Fondements du traitement automatique du langage}{10}{subsection.1.4.1}%
+\contentsline {subsubsection}{\numberline {1.4.1.1}Approches traditionnelles}{10}{subsubsection.1.4.1.1}%
+\contentsline {subsubsection}{\numberline {1.4.1.2}L'ère de l'apprentissage profond}{11}{subsubsection.1.4.1.2}%
+\contentsline {subsection}{\numberline {1.4.2}Les modèles de langage}{11}{subsection.1.4.2}%
+\contentsline {subsubsection}{\numberline {1.4.2.1}Principe}{11}{subsubsection.1.4.2.1}%
+\contentsline {subsubsection}{\numberline {1.4.2.2}Évolution chronologique}{11}{subsubsection.1.4.2.2}%
+\contentsline {subsubsection}{\numberline {1.4.2.3}Modèles multilingues}{11}{subsubsection.1.4.2.3}%
+\contentsline {subsubsection}{\numberline {1.4.2.4}Modèles spécialisés}{12}{subsubsection.1.4.2.4}%
+\contentsline {subsection}{\numberline {1.4.3}Les représentations vectorielles}{12}{subsection.1.4.3}%
+\contentsline {subsubsection}{\numberline {1.4.3.1}Définition et principes}{12}{subsubsection.1.4.3.1}%
+\contentsline {subsubsection}{\numberline {1.4.3.2}Évolution des approches}{13}{subsubsection.1.4.3.2}%
+\contentsline {subsubsection}{\numberline {1.4.3.3}Représentations denses et creuses}{13}{subsubsection.1.4.3.3}%
+\contentsline {subsection}{\numberline {1.4.4}Applications des grands modèles de langage}{13}{subsection.1.4.4}%
+\contentsline {section}{\numberline {1.5}Recherche d'information et modèles de classement}{14}{section.1.5}%
+\contentsline {subsection}{\numberline {1.5.1}Fondements de la recherche d'information}{14}{subsection.1.5.1}%
+\contentsline {subsubsection}{\numberline {1.5.1.1}Métriques d'évaluation}{15}{subsubsection.1.5.1.1}%
+\contentsline {subsection}{\numberline {1.5.2}Modèles lexicaux}{15}{subsection.1.5.2}%
+\contentsline {subsubsection}{\numberline {1.5.2.1}Le modèle vectoriel et la pondération TF-IDF}{15}{subsubsection.1.5.2.1}%
+\contentsline {subsubsection}{\numberline {1.5.2.2}Le modèle probabiliste BM25}{15}{subsubsection.1.5.2.2}%
+\contentsline {subsubsection}{\numberline {1.5.2.3}Limites des approches lexicales}{16}{subsubsection.1.5.2.3}%
+\contentsline {subsection}{\numberline {1.5.3}Modèles sémantiques}{16}{subsection.1.5.3}%
+\contentsline {subsection}{\numberline {1.5.4}Recherche hybride et fusion de classements}{17}{subsection.1.5.4}%
+\contentsline {subsubsection}{\numberline {1.5.4.1}Motivation}{17}{subsubsection.1.5.4.1}%
+\contentsline {subsubsection}{\numberline {1.5.4.2}La fusion par rang réciproque}{17}{subsubsection.1.5.4.2}%
+\contentsline {subsubsection}{\numberline {1.5.4.3}Variantes de la fusion}{18}{subsubsection.1.5.4.3}%
+\contentsline {subsubsection}{\numberline {1.5.4.4}Le ré-ordonnancement}{19}{subsubsection.1.5.4.4}%
+\contentsline {subsection}{\numberline {1.5.5}Application aux appels d'offres}{19}{subsection.1.5.5}%
+\contentsline {section}{\numberline {1.6}Génération augmentée par récupération}{20}{section.1.6}%
+\contentsline {subsection}{\numberline {1.6.1}Définition et principes fondamentaux}{20}{subsection.1.6.1}%
+\contentsline {subsection}{\numberline {1.6.2}Les composantes d'un système RAG}{20}{subsection.1.6.2}%
+\contentsline {subsubsection}{\numberline {1.6.2.1}Le récupérateur}{20}{subsubsection.1.6.2.1}%
+\contentsline {subsubsection}{\numberline {1.6.2.2}Le ré-ordonnançeur}{20}{subsubsection.1.6.2.2}%
+\contentsline {subsubsection}{\numberline {1.6.2.3}Le générateur}{22}{subsubsection.1.6.2.3}%
+\contentsline {subsection}{\numberline {1.6.3}Les variantes du RAG}{22}{subsection.1.6.3}%
+\contentsline {subsubsection}{\numberline {1.6.3.1}RAG naïf}{22}{subsubsection.1.6.3.1}%
+\contentsline {subsubsection}{\numberline {1.6.3.2}RAG à mémoire}{22}{subsubsection.1.6.3.2}%
+\contentsline {subsubsection}{\numberline {1.6.3.3}RAG hiérarchique}{22}{subsubsection.1.6.3.3}%
+\contentsline {subsubsection}{\numberline {1.6.3.4}RAG agentique}{23}{subsubsection.1.6.3.4}%
+\contentsline {subsubsection}{\numberline {1.6.3.5}RAG sur graphe}{23}{subsubsection.1.6.3.5}%
+\contentsline {subsection}{\numberline {1.6.4}Évaluation des systèmes RAG}{23}{subsection.1.6.4}%
+\contentsline {section}{\numberline {1.7}Bases de données vectorielles et recherche sémantique}{24}{section.1.7}%
+\contentsline {subsection}{\numberline {1.7.1}Principes}{24}{subsection.1.7.1}%
+\contentsline {subsection}{\numberline {1.7.2}Indexation approximative}{25}{subsection.1.7.2}%
+\contentsline {subsection}{\numberline {1.7.3}Propriétés recherchées pour les appels d'offres}{25}{subsection.1.7.3}%
+\contentsline {section}{\numberline {1.8}Traitement des documents structurés}{26}{section.1.8}%
+\contentsline {subsection}{\numberline {1.8.1}De l'OCR à la compréhension de documents}{26}{subsection.1.8.1}%
+\contentsline {subsection}{\numberline {1.8.2}Analyse de mise en page et reconnaissance de tableaux}{27}{subsection.1.8.2}%
+\contentsline {subsection}{\numberline {1.8.3}Enjeux pour les appels d'offres}{27}{subsection.1.8.3}%
+\contentsline {section}{\numberline {1.9}Résolution d'entités et graphes de connaissances}{28}{section.1.9}%
+\contentsline {subsection}{\numberline {1.9.1}Correspondance approximative}{28}{subsection.1.9.1}%
+\contentsline {subsection}{\numberline {1.9.2}Résolution d'entités}{28}{subsection.1.9.2}%
+\contentsline {subsection}{\numberline {1.9.3}Graphes de connaissances}{30}{subsection.1.9.3}%
+\contentsline {section}{\numberline {1.10}Workflows, architectures agentiques et supervision humaine}{31}{section.1.10}%
+\contentsline {subsection}{\numberline {1.10.1}Systèmes déterministes et systèmes agentiques}{31}{subsection.1.10.1}%
+\contentsline {subsection}{\numberline {1.10.2}Supervision humaine dans la boucle}{32}{subsection.1.10.2}%
+\contentsline {subsection}{\numberline {1.10.3}Architectures pour la génération de documents}{33}{subsection.1.10.3}%
+\contentsline {section}{\numberline {1.11}Solutions existantes et synthèse}{33}{section.1.11}%
+\contentsline {subsection}{\numberline {1.11.1}Solutions du marché}{33}{subsection.1.11.1}%
+\contentsline {subsection}{\numberline {1.11.2}Tendances émergentes}{34}{subsection.1.11.2}%
+\contentsline {subsection}{\numberline {1.11.3}Synthèse de l'état de l'art}{34}{subsection.1.11.3}%
+\contentsline {chapter}{\numberline {2}Méthodologie}{37}{chapter.2}%
+\contentsline {section}{\numberline {2.1}Introduction}{37}{section.2.1}%
+\contentsline {section}{\numberline {2.2}Problématique et approche générale}{38}{section.2.2}%
+\contentsline {subsection}{\numberline {2.2.1}Problématique métier}{38}{subsection.2.2.1}%
+\contentsline {subsection}{\numberline {2.2.2}Approche proposée}{38}{subsection.2.2.2}%
+\contentsline {section}{\numberline {2.3}Analyse des besoins et spécification}{39}{section.2.3}%
+\contentsline {subsection}{\numberline {2.3.1}Besoins fonctionnels}{39}{subsection.2.3.1}%
+\contentsline {subsection}{\numberline {2.3.2}Besoins non fonctionnels}{40}{subsection.2.3.2}%
+\contentsline {subsection}{\numberline {2.3.3}Spécifications fonctionnelles}{40}{subsection.2.3.3}%
+\contentsline {paragraph}{Ingestion et indexation (BF1, BF2).}{40}{subsection.2.3.3}%
+\contentsline {paragraph}{Extraction d'exigences (BF4).}{40}{subsection.2.3.3}%
+\contentsline {paragraph}{Génération de sections (BF5, BF6).}{40}{subsection.2.3.3}%
+\contentsline {subsection}{\numberline {2.3.4}Critères d'évaluation}{40}{subsection.2.3.4}%
+\contentsline {section}{\numberline {2.4}Modélisation des données}{41}{section.2.4}%
+\contentsline {subsection}{\numberline {2.4.1}Modèle conceptuel}{41}{subsection.2.4.1}%
+\contentsline {subsection}{\numberline {2.4.2}Relations structurantes}{42}{subsection.2.4.2}%
+\contentsline {subsection}{\numberline {2.4.3}Modèle logique}{42}{subsection.2.4.3}%
+\contentsline {section}{\numberline {2.5}Architecture du système}{42}{section.2.5}%
+\contentsline {subsection}{\numberline {2.5.1}Vue d'ensemble : deux horloges}{43}{subsection.2.5.1}%
+\contentsline {subsection}{\numberline {2.5.2}Architecture en couches}{43}{subsection.2.5.2}%
+\contentsline {subsection}{\numberline {2.5.3}Flux de données}{43}{subsection.2.5.3}%
+\contentsline {paragraph}{Flux d'ingestion.}{43}{subsection.2.5.3}%
+\contentsline {paragraph}{Flux de recherche.}{44}{subsection.2.5.3}%
+\contentsline {paragraph}{Flux de génération.}{44}{subsection.2.5.3}%
+\contentsline {section}{\numberline {2.6}Stratégie de recherche et de génération}{44}{section.2.6}%
+\contentsline {subsection}{\numberline {2.6.1}Recherche hybride}{44}{subsection.2.6.1}%
+\contentsline {subsection}{\numberline {2.6.2}Découpage parent-enfant}{45}{subsection.2.6.2}%
+\contentsline {subsection}{\numberline {2.6.3}Génération par section}{45}{subsection.2.6.3}%
+\contentsline {subsection}{\numberline {2.6.4}Stratégie graphe (seconde phase)}{46}{subsection.2.6.4}%
+\contentsline {section}{\numberline {2.7}Workflow de traitement}{47}{section.2.7}%
+\contentsline {subsection}{\numberline {2.7.1}Processus d'ingestion}{47}{subsection.2.7.1}%
+\contentsline {subsection}{\numberline {2.7.2}Processus de génération}{47}{subsection.2.7.2}%
+\contentsline {subsection}{\numberline {2.7.3}Routage des intentions}{49}{subsection.2.7.3}%
+\contentsline {section}{\numberline {2.8}Stratégie d'évaluation et de validation}{49}{section.2.8}%
+\contentsline {subsection}{\numberline {2.8.1}Évaluation de la récupération}{49}{subsection.2.8.1}%
+\contentsline {subsection}{\numberline {2.8.2}Évaluation de la génération}{50}{subsection.2.8.2}%
+\contentsline {subsection}{\numberline {2.8.3}Validation des hypothèses}{50}{subsection.2.8.3}%
+\contentsline {subsection}{\numberline {2.8.4}Robustesse}{50}{subsection.2.8.4}%
+\contentsline {section}{\numberline {2.9}Planification et synthèse}{51}{section.2.9}%
+\contentsline {subsection}{\numberline {2.9.1}Phases de développement}{51}{subsection.2.9.1}%
+\contentsline {subsection}{\numberline {2.9.2}Livrables}{51}{subsection.2.9.2}%
+\contentsline {subsection}{\numberline {2.9.3}Synthèse de la méthodologie}{51}{subsection.2.9.3}%
+\contentsline {chapter}{\numberline {3}Résultats et architecture technique}{53}{chapter.3}%
+\contentsline {section}{\numberline {3.1}Présentation de la plateforme développée}{53}{section.3.1}%
+\contentsline {subsection}{\numberline {3.1.1}Interface utilisateur}{53}{subsection.3.1.1}%
+\contentsline {subsection}{\numberline {3.1.2}Périmètre de la version évaluée}{54}{subsection.3.1.2}%
+\contentsline {section}{\numberline {3.2}Architecture technique}{54}{section.3.2}%
+\contentsline {subsection}{\numberline {3.2.1}Choix d'extraction documentaire}{55}{subsection.3.2.1}%
+\contentsline {subsection}{\numberline {3.2.2}Choix d'indexation}{55}{subsection.3.2.2}%
+\contentsline {subsection}{\numberline {3.2.3}Choix d'orchestration}{55}{subsection.3.2.3}%
+\contentsline {section}{\numberline {3.3}Performances et évaluation}{55}{section.3.3}%
+\contentsline {subsection}{\numberline {3.3.1}Performance de l'ingestion}{56}{subsection.3.3.1}%
+\contentsline {subsection}{\numberline {3.3.2}Performance de la recherche}{56}{subsection.3.3.2}%
+\contentsline {subsection}{\numberline {3.3.3}Performance de la génération}{56}{subsection.3.3.3}%
+\contentsline {subsection}{\numberline {3.3.4}Coûts}{57}{subsection.3.3.4}%
+\contentsline {section}{\numberline {3.4}Analyse comparative}{57}{section.3.4}%
+\contentsline {subsection}{\numberline {3.4.1}Approches de recherche}{57}{subsection.3.4.1}%
+\contentsline {subsection}{\numberline {3.4.2}Approches de découpage}{58}{subsection.3.4.2}%
+\contentsline {subsection}{\numberline {3.4.3}Approches de génération}{58}{subsection.3.4.3}%
+\contentsline {section}{\numberline {3.5}Discussion}{59}{section.3.5}%
+\contentsline {subsection}{\numberline {3.5.1}Forces du système}{59}{subsection.3.5.1}%
+\contentsline {subsection}{\numberline {3.5.2}Limites actuelles}{59}{subsection.3.5.2}%
+\contentsline {subsection}{\numberline {3.5.3}Pistes d'amélioration}{59}{subsection.3.5.3}%
+\contentsline {subsection}{\numberline {3.5.4}Conclusion du chapitre}{60}{subsection.3.5.4}%
+\contentsline {chapter}{Conclusion générale}{61}{chapter*.55}%
+\contentsline {chapter}{Bibliographie}{63}{chapter*.56}%
+\contentsline {chapter}{\numberline {A}Schéma de sortie d'une section}{65}{appendix.A}%
+\contentsline {chapter}{\numberline {B}Protocole du jeu de référence}{66}{appendix.B}%
+\contentsline {chapter}{\numberline {C}Glossaire des pièces d'un dossier}{67}{appendix.C}%
