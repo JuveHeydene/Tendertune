@@ -133,6 +133,26 @@ async def _run_expert_with_session(
         top8 = await _hybrid_pass(
             session, current_query, tenant_id=tenant_id, scope=scope, dossier_id=dossier_id, top_k=8
         )
+        # Trace quand même écrite (grade=None : "non gradé", pas "gradé et
+        # manquant") — sinon les statistiques d'évaluation (§1.3) seraient
+        # systématiquement biaisées en excluant tout le chemin "simple".
+        session.add(
+            RetrievalTrace(
+                tenant_id=tenant_id,
+                message_id=message_id,
+                sous_question_index=sous_question_index,
+                sous_question_texte=query,
+                expert=expert.value,
+                tentative=1,
+                query_utilisee=current_query,
+                filtres={"section_types": scope.get("section_types"), "doc_roles": scope.get("doc_roles")},
+                grade=None,
+                grade_method=None,
+                chunks_retournes=[{"chunk_id": c.get("chunk_id"), "score": c.get("rerank_score")} for c in top8],
+                abstention=not bool(top8),
+            )
+        )
+        await session.flush()
         return ResultatExpert(
             expert=expert,
             source=SourceContexte.retrieval if top8 else SourceContexte.abstention,

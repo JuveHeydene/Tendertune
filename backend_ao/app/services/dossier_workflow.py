@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.models.sql import Conversation, Dossier, Export, Generation, OutlineItem
 from app.services.minio_client import get_minio
-from app.workflow.sections import DEFAULT_OUTLINE
+from app.workflow.sections import DEFAULT_OUTLINE, archetype_for_key
 
 log = logging.getLogger("btp.dossier")
 
@@ -50,6 +50,7 @@ async def ensure_dossier(session: AsyncSession, conv: Conversation, user) -> Dos
                 title=title,
                 sort_order=i,
                 status="todo",
+                archetype=archetype_for_key(key),
             )
         )
     conv.dossier_id = doss.id
@@ -82,6 +83,7 @@ async def ensure_outline_item(
         title=title,
         sort_order=int(max_ord) + 1,
         status="todo",
+        archetype=archetype_for_key(key),
     )
     session.add(row)
     await session.flush()
@@ -97,7 +99,13 @@ async def save_generation(
     texte: str,
     citations: list,
     model: str,
+    content: dict | None = None,
+    context_snapshot: dict | None = None,
+    exigences_couvertes: list | None = None,
 ) -> Generation:
+    """`content` : passer le dump complet de `SectionGeneree` (V2, blocs +
+    citations + abstentions) pour une persistance structurée — sinon repli
+    sur l'ancien format {"titre", "texte"} (compat V1)."""
     item = await ensure_outline_item(session, dossier.id, section_key, title)
     last_v = (
         await session.execute(
@@ -110,8 +118,10 @@ async def save_generation(
     gen = Generation(
         dossier_id=dossier.id,
         section_key=section_key,
-        content={"titre": title, "texte": texte},
+        content=content if content is not None else {"titre": title, "texte": texte},
         citations=citations or [],
+        context_snapshot=context_snapshot or {},
+        exigences_couvertes=exigences_couvertes or [],
         model=model,
         version=int(last_v) + 1,
     )

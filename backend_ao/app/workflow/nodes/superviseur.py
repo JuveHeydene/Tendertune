@@ -76,6 +76,8 @@ R9. "experts" PEUT être vide ([]) — UNIQUEMENT si le message de l'utilisateur
     nécessaire à CETTE sous-question précise. Dans le doute, NE PAS mettre
     experts=[] : une recherche redondante coûte peu, une génération privée
     d'information disponible coûte cher en confiance.
+R10. Le champ "texte" de chaque sous-question DOIT être écrit en FRANÇAIS,
+    même si tu raisonnes en anglais — ne traduis JAMAIS la question.
 
 Historique :
 {history}
@@ -120,16 +122,42 @@ def run_superviseur(query_clean: str, history: list[dict] | None) -> Superviseur
         return _fallback(query_clean)
 
     # Garde-fous appliqués côté code même si le LLM les a mal respectés —
-    # ne jamais faire confiance aveuglément à la sortie d'un LLM (§8, R3/R4).
+    # ne jamais faire confiance aveuglément à la sortie d'un LLM (§8, R3/R4/R7).
+    # Constat en test réel (llama3, modèle local modeste) : le JSON valide
+    # côté Pydantic mais viole parfois la sémantique voulue (is_compound=true
+    # avec 1 seule sous-question, clarification_needed avec sous_questions
+    # non vides). On corrige plutôt que de faire confiance au flag du modèle.
     if len(output.sous_questions) > MAX_SOUS_QUESTIONS:
         log.warning("Superviseur — %d sous-questions > max, tronqué", len(output.sous_questions))
         output.sous_questions = output.sous_questions[:MAX_SOUS_QUESTIONS]
-    if output.intent in (Intent.smalltalk, Intent.export):
+
+    if output.intent == Intent.clarification_needed and output.sous_questions:
+        # R7 : clarification_needed → sous_questions=[] TOUJOURS. Si le modèle
+        # en a quand même produit, c'est plus probablement une mauvaise
+        # classification qu'un vrai besoin de clarification — ne pas bloquer
+        # l'utilisateur pour rien, requalifier en hybrid_rag.
+        log.warning("Superviseur — clarification_needed avec sous_questions, requalifié hybrid_rag")
+        output.intent = Intent.hybrid_rag
+
+    if output.intent in (Intent.smalltalk, Intent.export, Intent.clarification_needed):
         output.sous_questions = []
+    else:
         output.message_clarification = None
+
     if output.intent == Intent.clarification_needed and not output.message_clarification:
         output.message_clarification = (
             "Pouvez-vous préciser votre demande ? Elle comporte trop de critères "
             "distincts pour une seule recherche."
         )
+
+    if output.intent in (Intent.hybrid_rag, Intent.run_section) and not output.sous_questions:
+        # Le modèle a choisi une intention qui exige une recherche mais n'a
+        # produit aucune sous-question — repli sur la requête telle quelle.
+        output.sous_questions = [
+            SousQuestion(texte=query_clean, experts=[Expert.patrimoine], complexite=Complexite.simple)
+        ]
+
+    # is_compound DÉRIVÉ du nombre réel de sous-questions plutôt que du flag
+    # du modèle (R4) : garantit la cohérence par construction.
+    output.is_compound = len(output.sous_questions) > 1
     return output

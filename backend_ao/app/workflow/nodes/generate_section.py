@@ -156,3 +156,31 @@ async def generate_section(
         blocs=[Bloc(type="paragraphe", texte="[Génération non aboutie — voir logs]")],
         abstentions=aggregated.abstentions + (["Échec technique de génération."] if last_error else []),
     )
+
+
+def section_to_markdown(section: SectionGeneree) -> str:
+    """Rendu markdown d'une SectionGeneree — pour l'affichage chat/preview et
+    les exports texte/markdown. Un bloc image est représenté par une
+    référence explicite : l'insertion réelle dans le DOCX suppose une
+    confirmation humaine (§5.4) faite depuis l'écran de revue, pas ici."""
+
+    lines: list[str] = []
+    for bloc in section.blocs:
+        if bloc.type == "sous_titre":
+            level = min(max(bloc.heading_level or 3, 1), 3)
+            lines.append(f"{'#' * (level + 1)} {bloc.texte}")
+        elif bloc.type == "liste":
+            for item in bloc.texte.split("\n"):
+                item = item.strip()
+                if item:
+                    lines.append(f"- {item.lstrip('-').strip()}")
+        elif bloc.type == "image":
+            lines.append(f"[Image proposée : {bloc.document_id} — à confirmer en revue]")
+        else:
+            lines.append(bloc.texte)
+        lines.append("")
+    if section.abstentions:
+        lines.append("**Points non couverts :**")
+        for a in section.abstentions:
+            lines.append(f"- ⚠️ {a}")
+    return "\n".join(lines).strip()

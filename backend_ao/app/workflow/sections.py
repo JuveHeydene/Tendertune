@@ -8,6 +8,25 @@ DEFAULT_OUTLINE: list[tuple[str, int, str]] = [
     ("planning", 1, "Planning et délais"),
 ]
 
+# V2 — §10 : spécialisation déterministe du prompt de génération. Lookup
+# fixe pour le canevas par défaut ; un plan extrait dynamiquement (§9,
+# extract_outline) classe son propre archetype au moment de l'extraction.
+ARCHETYPE_BY_KEY: dict[str, str] = {
+    "presentation": "institutionnelle",
+    "moyens_humains": "factuelle",
+    "moyens_materiels": "factuelle",
+    "references": "factuelle",
+    "methodologie": "narrative",
+    "comprehension": "narrative",
+    "planning": "factuelle",
+    "qse": "conformite",
+}
+DEFAULT_ARCHETYPE = "factuelle"
+
+
+def archetype_for_key(key: str) -> str:
+    return ARCHETYPE_BY_KEY.get(key, DEFAULT_ARCHETYPE)
+
 _ALL = (
     "tout le mémoire",
     "tout le memoire",

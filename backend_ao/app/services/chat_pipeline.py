@@ -14,15 +14,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.config import get_settings
+from app.models.pydantic import Intent
 from app.models.sql import Conversation, Message, User
 from app.services.chat_history import format_history
 from app.services.dossier_workflow import ensure_dossier, export_document, save_generation
 from app.services.ollama_llm import ollama_generate_stream
+from app.workflow.agentic_pipeline import run_agentic_retrieval
 from app.workflow.graph import compiled_graph
-from app.workflow.nodes.generate import build_prompt
+from app.workflow.nodes.generate_section import generate_section, section_to_markdown
 from app.workflow.nodes.route import route as route_node
 from app.workflow.nodes.retrieve import retrieve as retrieve_node
-from app.workflow.sections import DEFAULT_OUTLINE
+from app.workflow.sections import DEFAULT_OUTLINE, archetype_for_key, pick_section
 
 log = logging.getLogger("btp.chat")
 
@@ -111,6 +113,62 @@ def _short_reply(intent: str, *, section_title: str | None = None, export_fmt: s
             "ou exportez le document."
         )
     return "Voici ma réponse :"
+
+
+def _chunk_text(text: str, size: int = 120) -> list[str]:
+    """Découpe un texte déjà généré en morceaux pour l'émission SSE `token`.
+    Pas un vrai streaming Ollama token-par-token (impossible ici : la sortie
+    JSON contrainte doit être complète et validée avant tout affichage,
+    §10/§1 étape 9) — juste une émission progressive plutôt qu'un seul bloc,
+    sans délai artificiel (aucun bénéfice réel à ralentir la réponse)."""
+    if not text:
+        return []
+    words = text.split(" ")
+    out: list[str] = []
+    buf = ""
+    for w in words:
+        candidate = f"{buf} {w}".strip()
+        if len(candidate) > size and buf:
+            out.append(buf + " ")
+            buf = w
+        else:
+            buf = candidate
+    if buf:
+        out.append(buf)
+    return out
+
+
+async def _persist_section_v2(
+    session: AsyncSession,
+    conv: Conversation,
+    user: User,
+    *,
+    section_key: str,
+    section_title: str,
+    section,  # SectionGeneree
+    citations: list,
+    context_snapshot: dict,
+) -> UUID | None:
+    """Persistance V2 : contenu structuré complet (blocs, abstentions), pas
+    seulement un pavé de texte — §1 étape 8/9."""
+    if not can_write(user):
+        return None
+    doss = await ensure_dossier(session, conv, user)
+    model = get_settings().llm_model
+    rendered = section_to_markdown(section)
+    gen = await save_generation(
+        session,
+        dossier=doss,
+        section_key=section_key,
+        title=section_title,
+        texte=rendered,
+        citations=citations,
+        model=model,
+        content={**section.model_dump(), "texte": rendered},
+        context_snapshot=context_snapshot,
+        exigences_couvertes=section.exigences_couvertes,
+    )
+    return gen.id
 
 
 async def _persist_sections(
@@ -252,6 +310,10 @@ async def stream_message(
     user: User,
     text: str,
 ) -> AsyncIterator[str]:
+    """Chemin SSE V2 : rewrite → Superviseur → experts/CRAG (§5) → agrégation
+    (§5.4) → génération (§10). Remplace le route/retrieve mots-clés par le
+    pipeline agentique — voir Nouvelle_Architecture/diagrammes_sequence_v2.txt
+    Diagramme 2 pour la séquence complète."""
     history = _message_history(conv)
     user_msg = Message(conversation_id=conv.id, role="user", content=text)
     session.add(user_msg)
@@ -259,32 +321,54 @@ async def stream_message(
     yield _sse("user", {"content": text})
 
     try:
-        state = await asyncio.to_thread(_route_retrieve, text, user.tenant_id, history)
+        query_clean, superviseur_output, aggregated = await run_agentic_retrieval(
+            text,
+            history,
+            tenant_id=user.tenant_id,
+            dossier_id=conv.dossier_id,
+            message_id=user_msg.id,
+        )
     except Exception as exc:
-        log.exception("route/retrieve échec")
+        log.exception("pipeline agentique échec")
         yield _sse("error", {"message": str(exc)})
         return
 
-    intent = state.get("intent") or "hybrid_rag"
+    intent = superviseur_output.intent.value
     yield _sse("intent", {"intent": intent})
+    user_msg.meta = {
+        **(user_msg.meta or {}),
+        "query_clean": query_clean,
+        "superviseur": superviseur_output.model_dump(mode="json"),
+    }
 
     if intent == "smalltalk":
-        from app.workflow.nodes.chitchat import chitchat
-
-        out = chitchat(state)
-        md = out.get("answer") or ""
+        md = (
+            "Bonjour. Posez une question sur le patrimoine, demandez de rédiger une section "
+            "ou exportez le document."
+        )
         yield _sse("token", {"t": md})
         yield _sse("preview", {"markdown": md})
-        assistant = Message(
-            conversation_id=conv.id,
-            role="assistant",
-            content=_short_reply("smalltalk"),
-            meta={"intent": intent, "markdown": md},
+        session.add(
+            Message(
+                conversation_id=conv.id, role="assistant", content=_short_reply("smalltalk"),
+                meta={"intent": intent, "markdown": md},
+            )
         )
-        session.add(assistant)
         conv.updated_at = datetime.now(UTC)
         if conv.title == "Nouvelle conversation":
             conv.title = text[:80]
+        await session.commit()
+        yield _sse("done", {"ok": True})
+        return
+
+    if intent == "clarification_needed":
+        msg = superviseur_output.message_clarification or "Pouvez-vous préciser votre demande ?"
+        yield _sse("token", {"t": msg})
+        yield _sse("preview", {"markdown": msg})
+        session.add(
+            Message(conversation_id=conv.id, role="assistant", content=msg, meta={"intent": intent})
+        )
+        conv.updated_at = datetime.now(UTC)
         await session.commit()
         yield _sse("done", {"ok": True})
         return
@@ -294,12 +378,7 @@ async def stream_message(
         lowered = text.lower()
         for candidate in ("pdf", "markdown", "md", "txt", "text", "docx"):
             if candidate in lowered:
-                if candidate in ("markdown", "md"):
-                    fmt = "md"
-                elif candidate in ("text", "txt"):
-                    fmt = "txt"
-                else:
-                    fmt = candidate if candidate != "markdown" else "md"
+                fmt = "md" if candidate in ("markdown", "md") else ("txt" if candidate in ("text", "txt") else candidate)
                 break
         if not can_write(user):
             yield _sse("error", {"message": "Export réservé au rédacteur, manager ou admin."})
@@ -308,15 +387,11 @@ async def stream_message(
             doss = await ensure_dossier(session, conv, user)
             msgs = sorted(conv.messages or [], key=lambda m: m.created_at)
             notes = "\n\n".join(f"{m.role}: {m.content}" for m in msgs[-12:])
-            rec, _ = await export_document(
-                session, dossier=doss, user=user, fmt=fmt, transcript=notes
-            )
+            rec, _ = await export_document(session, dossier=doss, user=user, fmt=fmt, transcript=notes)
             msg = _short_reply("export", export_fmt=fmt) + f" (v{rec.version})"
             session.add(
                 Message(
-                    conversation_id=conv.id,
-                    role="assistant",
-                    content=msg,
+                    conversation_id=conv.id, role="assistant", content=msg,
                     meta={"intent": "export", "export": True, "format": fmt, "version": rec.version},
                 )
             )
@@ -336,82 +411,125 @@ async def stream_message(
         yield _sse("error", {"message": msg})
         return
 
-    sections_to_run: list[tuple[str, str]] = []
-    if intent == "run_section":
-        if state.get("generate_all"):
-            sections_to_run = [(k, t) for k, _l, t in DEFAULT_OUTLINE]
-        else:
-            sections_to_run = [(state["section_key"], state["section_title"])]
-    else:
-        sections_to_run = [("__chat__", "Réponse")]
-
-    section_texts: dict[str, str] = {}
-    preview_parts: list[str] = []
-
-    for sk, stitle in sections_to_run:
-        yield _sse("section_start", {"key": sk, "title": stitle})
-        run_state = {**state, "intent": "run_section" if sk != "__chat__" else "hybrid_rag"}
-        if sk != "__chat__":
-            run_state["query"] = f"Rédige la section : {stitle}"
-            run_state["section_key"] = sk
-            run_state["section_title"] = stitle
-        prompt, _extra = build_prompt(run_state)
+    # ------------------------------------------------------------------
+    # hybrid_rag : réponse conversationnelle, streaming réel token-par-token
+    # (pas de contrat JSON à valider ici — rien n'empêche le vrai streaming
+    # Ollama, contrairement à run_section ci-dessous).
+    # ------------------------------------------------------------------
+    if intent == Intent.hybrid_rag.value:
+        yield _sse("section_start", {"key": "__chat__", "title": "Réponse"})
+        history_block = format_history(history)
+        prompt = (
+            "Tu es un assistant BTP pour préparer un dossier d'appel d'offres. Français.\n"
+            "Réponds en Markdown, pas de titre H1. Pas d'invention de montants, SIRET ou dates.\n"
+            "Utilise UNIQUEMENT les extraits numérotés. Cite [1], [2]... quand tu t'appuies dessus.\n"
+            "Si les extraits ne suffisent pas, dis-le explicitement plutôt que d'inventer.\n"
+            f"{history_block}"
+            f"Question :\n{query_clean}\n\nExtraits :\n{aggregated.context_text}\n\nRéponse Markdown :"
+        )
         buf: list[str] = []
         try:
             async for token in _iter_ollama_tokens(prompt):
                 buf.append(token)
-                yield _sse("token", {"t": token, "section_key": sk})
+                yield _sse("token", {"t": token, "section_key": "__chat__"})
         except Exception as exc:
             yield _sse("error", {"message": str(exc)})
             return
         md = "".join(buf)
-        section_texts[sk] = md
-        preview_parts.append(f"## {stitle}\n\n{md}" if sk != "__chat__" else md)
+        yield _sse("section_end", {"key": "__chat__", "title": "Réponse", "markdown": md})
+        yield _sse("preview", {"markdown": md})
+
+        chat_msg = _short_reply("hybrid_rag")
+        meta = {
+            "intent": intent,
+            "markdown": md,
+            "citations": [{"chunk_id": c} for c in aggregated.citations[:8]],
+            "abstentions": aggregated.abstentions,
+            "experts_par_citation": aggregated.experts_par_citation,
+        }
+        session.add(Message(conversation_id=conv.id, role="assistant", content=chat_msg, meta=meta))
+        conv.updated_at = datetime.now(UTC)
+        if conv.title == "Nouvelle conversation":
+            conv.title = text[:80]
+        await session.commit()
+        yield _sse("done", {"ok": True, "message": chat_msg})
+        return
+
+    # ------------------------------------------------------------------
+    # run_section : génération JSON contrainte (§10), pas de streaming
+    # token-par-token réel — la sortie doit être complète et validée avant
+    # tout affichage (retry borné à 2 essais si invalide, §1 étape 9).
+    # ------------------------------------------------------------------
+    generate_all = any(
+        w in query_clean.lower()
+        for w in ("tout le mémoire", "tout le memoire", "toutes les sections", "le mémoire complet")
+    )
+    if generate_all:
+        sections_to_run = [(k, t) for k, _lvl, t in DEFAULT_OUTLINE]
+    else:
+        key, title, _all_flag = pick_section(query_clean)
+        sections_to_run = [(key, title)]
+
+    preview_parts: list[str] = []
+    last_generation_id: UUID | None = None
+    last_section_key = sections_to_run[0][0]
+    last_section_title = sections_to_run[0][1]
+
+    for sk, stitle in sections_to_run:
+        yield _sse("section_start", {"key": sk, "title": stitle})
+
+        if sk == sections_to_run[0][0] and not generate_all:
+            # Réutilise le contexte déjà agrégé pour la demande initiale.
+            section_aggregated = aggregated
+        else:
+            # §9 / §5.5 : chaque section mérite sa PROPRE recherche — ne pas
+            # réutiliser aveuglément le contexte d'une autre section.
+            _q, _sup, section_aggregated = await run_agentic_retrieval(
+                f"Rédige la section : {stitle}", history,
+                tenant_id=user.tenant_id, dossier_id=conv.dossier_id, message_id=user_msg.id,
+            )
+            section_aggregated = section_aggregated or aggregated
+
+        section = await generate_section(
+            section_key=sk,
+            titre=stitle,
+            archetype=archetype_for_key(sk),
+            aggregated=section_aggregated,
+            history=history,
+        )
+        md = section_to_markdown(section)
+        for piece in _chunk_text(md):
+            yield _sse("token", {"t": piece, "section_key": sk})
+        preview_parts.append(f"## {stitle}\n\n{md}")
         yield _sse("section_end", {"key": sk, "title": stitle, "markdown": md})
+
+        last_generation_id = await _persist_section_v2(
+            session, conv, user,
+            section_key=sk, section_title=stitle, section=section,
+            citations=section.citations,
+            context_snapshot={"extraits": section_aggregated.context_text[:20000]},
+        )
+        last_section_key, last_section_title = sk, stitle
 
     full_preview = "\n\n---\n\n".join(preview_parts)
     yield _sse("preview", {"markdown": full_preview})
 
-    state["answer"] = section_texts.get(state.get("section_key") or "", full_preview)
-    generation_id = None
-    if intent == "run_section":
-        state["section_key"] = sections_to_run[0][0]
-        state["section_title"] = sections_to_run[0][1]
-        if len(sections_to_run) > 1:
-            state["generate_all"] = True
-        generation_id = await _persist_sections(
-            session, conv, user, state, section_texts={
-                k: v for k, v in section_texts.items() if k != "__chat__"
-            }
-        )
-        chat_msg = (
-            "Mémoire complet rédigé."
-            if state.get("generate_all")
-            else _short_reply("run_section", section_title=sections_to_run[0][1])
-        )
-    else:
-        chat_msg = _short_reply("hybrid_rag")
-        state["citations"] = [
-            {"chunk_id": h.get("chunk_id"), "page": h.get("page"), "score": h.get("score")}
-            for h in (state.get("retrieved") or [])[:6]
-        ]
-
+    chat_msg = (
+        "Mémoire complet rédigé." if generate_all
+        else _short_reply("run_section", section_title=last_section_title)
+    )
     meta = {
         "intent": intent,
         "markdown": full_preview,
-        "citations": state.get("citations") or [],
-        "generation_id": str(generation_id) if generation_id else None,
+        "generation_id": str(last_generation_id) if last_generation_id else None,
+        "section_key": last_section_key,
+        "section_title": last_section_title,
+        "abstentions": aggregated.abstentions if aggregated else [],
     }
-    if intent == "run_section":
-        meta["section_key"] = state.get("section_key")
-        meta["section_title"] = state.get("section_title")
     session.add(
         Message(
-            conversation_id=conv.id,
-            role="assistant",
-            content=chat_msg,
-            generation_id=generation_id,
-            meta=meta,
+            conversation_id=conv.id, role="assistant", content=chat_msg,
+            generation_id=last_generation_id, meta=meta,
         )
     )
     conv.updated_at = datetime.now(UTC)
