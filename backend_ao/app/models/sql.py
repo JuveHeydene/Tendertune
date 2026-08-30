@@ -111,6 +111,11 @@ class Document(Base):
     doc_type: Mapped[str | None] = mapped_column(String(32))
     is_dao: Mapped[bool] = mapped_column(Boolean, default=False)
     dossier_origine_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("dossiers.id", ondelete="SET NULL"))
+    # V2 — doc_role="annexe" : pièce d'appoint scopée à CE dossier uniquement
+    # (contrainte annexe_requires_dossier en base : présent <=> doc_role="annexe")
+    dossier_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("dossiers.id", ondelete="CASCADE"), nullable=True
+    )
     status: Mapped[str] = mapped_column(String(32), default="pending")
     graph_extracted: Mapped[bool] = mapped_column(Boolean, default=False)
     ingest_error: Mapped[str | None] = mapped_column(Text)
@@ -141,6 +146,10 @@ class ChunkRow(Base):
     page: Mapped[int | None] = mapped_column(Integer)
     token_count: Mapped[int | None] = mapped_column(Integer)
     extra: Mapped[dict] = mapped_column(JSONB, default=dict)
+    # V2 — routage dynamique des experts (§3.1) : signal doux, jamais un filtre dur.
+    # NB : `text_fts` (tsvector généré) n'est PAS mappé ici — colonne interne à
+    # Postgres, jamais lue/écrite par l'ORM, requêtée en SQL brut (retrieve_sparse).
+    section_type: Mapped[str | None] = mapped_column(String(16))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -193,6 +202,9 @@ class OutlineItem(Base):
     title: Mapped[str] = mapped_column(String(512), nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[str] = mapped_column(String(32), default="todo")
+    # V2 — spécialisation déterministe du prompt de génération (§10) :
+    # lookup direct, jamais un agent qui choisit.
+    archetype: Mapped[str] = mapped_column(String(16), default="factuelle")
     custom_instruction: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -208,6 +220,9 @@ class Generation(Base):
     citations: Mapped[list] = mapped_column(JSONB, default=list)
     context_snapshot: Mapped[dict] = mapped_column(JSONB, default=dict)
     exigences_couvertes: Mapped[list] = mapped_column(JSONB, default=list)
+    # V2 — résumé de progression du dossier, précalculé à l'approve (§2.3),
+    # jamais recalculé à chaque question.
+    summary_short: Mapped[str | None] = mapped_column(Text)
     model: Mapped[str | None] = mapped_column(String(128))
     version: Mapped[int] = mapped_column(Integer, default=1)
     generation_time_seconds: Mapped[float | None] = mapped_column(Float)
@@ -276,3 +291,43 @@ class Export(Base):
     sections_included: Mapped[list] = mapped_column(JSONB, default=list)
     exported_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class RetrievalTrace(Base):
+    """V2 — 1 ligne par tentative CRAG. Observabilité + métriques d'évaluation
+    (Nouvelle_Architecture/base_de_donnees_et_interface.md §1.3)."""
+
+    __tablename__ = "retrieval_traces"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    message_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("messages.id", ondelete="CASCADE"))
+    generation_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("generations.id", ondelete="SET NULL"))
+    sous_question_index: Mapped[int] = mapped_column(Integer, default=0)
+    sous_question_texte: Mapped[str | None] = mapped_column(Text)
+    expert: Mapped[str] = mapped_column(String(16), nullable=False)
+    tentative: Mapped[int] = mapped_column(Integer, nullable=False)
+    query_utilisee: Mapped[str] = mapped_column(Text, nullable=False)
+    filtres: Mapped[dict] = mapped_column(JSONB, default=dict)
+    grade: Mapped[str | None] = mapped_column(String(16))
+    grade_method: Mapped[str | None] = mapped_column(String(16))
+    chunks_retournes: Mapped[list] = mapped_column(JSONB, default=list)
+    abstention: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class DossierPiece(Base):
+    """V2 — checklist du dossier administratif : on attache un DOCUMENT entier,
+    pas une citation de chunk (sémantique différente de `exigences`), §5.3."""
+
+    __tablename__ = "dossier_pieces"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    dossier_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("dossiers.id", ondelete="CASCADE"), nullable=False)
+    libelle: Mapped[str] = mapped_column(String(255), nullable=False)
+    obligatoire: Mapped[bool] = mapped_column(Boolean, default=True)
+    document_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("documents.id", ondelete="SET NULL"))
+    statut: Mapped[str] = mapped_column(String(32), default="manquant")
+    source: Mapped[str] = mapped_column(String(16), default="standard")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

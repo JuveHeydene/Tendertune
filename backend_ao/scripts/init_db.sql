@@ -114,9 +114,12 @@ CREATE TABLE IF NOT EXISTS documents (
     object_key      VARCHAR(512) NOT NULL,
     sha             VARCHAR(64) NOT NULL,
     doc_role        VARCHAR(32) NOT NULL
-                    CHECK (doc_role IN ('patrimoine', 'dao_courant', 'dao_archive')),
+                    CHECK (doc_role IN ('patrimoine', 'dao_courant', 'dao_archive', 'annexe')),
     doc_type        VARCHAR(32)
-                    CHECK (doc_type IN ('rc', 'cctp', 'ccap', 'memoire', 'reference', 'dpgf', 'bpu', 'autre')),
+                    CHECK (doc_type IN (
+                        'rc', 'cctp', 'ccap', 'memoire', 'reference',
+                        'dpgf', 'bpu', 'administratif', 'autre'
+                    )),
     is_dao          BOOLEAN NOT NULL DEFAULT FALSE,
     status          VARCHAR(32) NOT NULL DEFAULT 'pending'
                     CHECK (status IN ('pending', 'processing', 'ready', 'failed', 'needs_review')),
@@ -167,6 +170,17 @@ ALTER TABLE documents
 
 CREATE INDEX IF NOT EXISTS idx_documents_dossier_origine ON documents (dossier_origine_id);
 
+-- V2 — documents "annexe" : pièce d'appoint scopée à UN dossier, jamais dans le
+-- patrimoine partagé (Nouvelle_Architecture/base_de_donnees_et_interface.md §1.5)
+ALTER TABLE documents
+    ADD COLUMN IF NOT EXISTS dossier_id UUID REFERENCES dossiers (id) ON DELETE CASCADE;
+
+CREATE INDEX IF NOT EXISTS idx_documents_dossier ON documents (dossier_id) WHERE dossier_id IS NOT NULL;
+
+ALTER TABLE documents
+    ADD CONSTRAINT annexe_requires_dossier
+    CHECK ((doc_role = 'annexe') = (dossier_id IS NOT NULL));
+
 CREATE TABLE IF NOT EXISTS chunks (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     document_id   UUID NOT NULL REFERENCES documents (id) ON DELETE CASCADE,
@@ -176,6 +190,10 @@ CREATE TABLE IF NOT EXISTS chunks (
     page          INTEGER,
     token_count   INTEGER,
     extra         JSONB NOT NULL DEFAULT '{}'::jsonb,
+    -- V2 — routage dynamique des experts (§3.1) : signal DOUX, jamais un filtre dur
+    section_type  VARCHAR(16)
+                  CHECK (section_type IS NULL OR section_type IN
+                      ('rc', 'ccap', 'cctp', 'dpgf', 'bpu', 'memoire', 'reference', 'autre')),
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT chunk_not_self_parent CHECK (id <> parent_id)
@@ -184,6 +202,14 @@ CREATE TABLE IF NOT EXISTS chunks (
 CREATE INDEX IF NOT EXISTS idx_chunks_document ON chunks (document_id);
 CREATE INDEX IF NOT EXISTS idx_chunks_parent ON chunks (parent_id);
 CREATE INDEX IF NOT EXISTS idx_chunks_page ON chunks (document_id, page);
+CREATE INDEX IF NOT EXISTS idx_chunks_section_type ON chunks (section_type);
+
+-- V2 — recherche sparse (BM25-like), config française, colonne générée
+ALTER TABLE chunks
+    ADD COLUMN IF NOT EXISTS text_fts tsvector
+    GENERATED ALWAYS AS (to_tsvector('french', coalesce(text, ''))) STORED;
+
+CREATE INDEX IF NOT EXISTS idx_chunks_text_fts ON chunks USING GIN (text_fts);
 
 CREATE TABLE IF NOT EXISTS exigences (
     id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -221,6 +247,9 @@ CREATE TABLE IF NOT EXISTS outline_items (
     sort_order          INTEGER NOT NULL,
     status              VARCHAR(32) NOT NULL DEFAULT 'todo'
                         CHECK (status IN ('todo', 'generated', 'approved', 'rejected')),
+    -- V2 — spécialisation déterministe du prompt de génération (§10)
+    archetype           VARCHAR(16) NOT NULL DEFAULT 'factuelle'
+                        CHECK (archetype IN ('institutionnelle', 'factuelle', 'narrative', 'conformite')),
     custom_instruction  TEXT,
     created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -239,6 +268,8 @@ CREATE TABLE IF NOT EXISTS generations (
     citations                 JSONB NOT NULL DEFAULT '[]'::jsonb,
     context_snapshot          JSONB NOT NULL DEFAULT '{}'::jsonb,
     exigences_couvertes       JSONB NOT NULL DEFAULT '[]'::jsonb,
+    -- V2 — résumé de progression du dossier, précalculé à l'approve (§2.3)
+    summary_short             TEXT,
     model                     VARCHAR(128),
     version                   INTEGER NOT NULL DEFAULT 1,
     generation_time_seconds   DOUBLE PRECISION,
@@ -314,6 +345,46 @@ CREATE TABLE IF NOT EXISTS exports (
 
 CREATE INDEX IF NOT EXISTS idx_exports_dossier ON exports (dossier_id);
 CREATE INDEX IF NOT EXISTS idx_exports_version ON exports (dossier_id, version);
+
+-- V2 — observabilité de la boucle CRAG + métriques d'évaluation
+-- (Nouvelle_Architecture/base_de_donnees_et_interface.md §1.3)
+CREATE TABLE IF NOT EXISTS retrieval_traces (
+    id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id            UUID NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
+    message_id           UUID REFERENCES messages (id) ON DELETE CASCADE,
+    generation_id        UUID REFERENCES generations (id) ON DELETE SET NULL,
+    sous_question_index  INTEGER NOT NULL DEFAULT 0,
+    sous_question_texte  TEXT,
+    expert               VARCHAR(16) NOT NULL
+                         CHECK (expert IN ('juridique', 'technique', 'financier', 'graphe', 'patrimoine')),
+    tentative            INTEGER NOT NULL CHECK (tentative BETWEEN 1 AND 3),
+    query_utilisee       TEXT NOT NULL,
+    filtres              JSONB NOT NULL DEFAULT '{}'::jsonb,
+    grade                VARCHAR(16) CHECK (grade IS NULL OR grade IN ('correct', 'ambigu', 'incorrect')),
+    grade_method         VARCHAR(16) CHECK (grade_method IS NULL OR grade_method IN ('seuil', 'llm_juge')),
+    chunks_retournes     JSONB NOT NULL DEFAULT '[]'::jsonb,
+    abstention           BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_traces_message ON retrieval_traces (message_id);
+CREATE INDEX IF NOT EXISTS idx_traces_tenant_expert_grade ON retrieval_traces (tenant_id, expert, grade);
+
+-- V2 — checklist du dossier administratif (§5.3)
+CREATE TABLE IF NOT EXISTS dossier_pieces (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    dossier_id    UUID NOT NULL REFERENCES dossiers (id) ON DELETE CASCADE,
+    libelle       VARCHAR(255) NOT NULL,
+    obligatoire   BOOLEAN NOT NULL DEFAULT TRUE,
+    document_id   UUID REFERENCES documents (id) ON DELETE SET NULL,
+    statut        VARCHAR(32) NOT NULL DEFAULT 'manquant'
+                  CHECK (statut IN ('manquant', 'trouve_patrimoine', 'a_uploader', 'fourni')),
+    source        VARCHAR(16) NOT NULL DEFAULT 'standard' CHECK (source IN ('rc', 'standard')),
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_dossier_pieces_dossier ON dossier_pieces (dossier_id);
 
 -- Tenant initial. L'utilisateur admin n'est PAS inséré ici :
 -- le hash bcrypt doit coller à Python (app/services/seed.py au démarrage API).
