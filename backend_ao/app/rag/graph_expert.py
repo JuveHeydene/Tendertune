@@ -14,13 +14,13 @@ import logging
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.graph.cypher import BOUNDED_TWO_HOP, CONFORMITE_REL_TYPES, ONE_HOP
 from app.graph.entity_match import EntityMatchIndex
 from app.graph.extract import ENTITY_TYPES, load_tenant_index, neo4j_driver
 from app.models.pydantic import Expert, ExtraitCite, ResultatExpert, SourceContexte
 from app.models.sql import ChunkRow
+from app.services.db_client import session_factory
 from app.services.ollama_llm import ollama_generate_json
 
 log = logging.getLogger("btp.graph_expert")
@@ -47,11 +47,12 @@ async def _extract_query_entities(query: str) -> list[dict]:
 
 
 async def run_graph_expert(
-    session: AsyncSession,
     query: str,
     *,
     tenant_id: UUID,
 ) -> ResultatExpert:
+    """Ouvre sa propre session (même raison que run_expert, app/rag/experts.py :
+    exécution concurrente sûre via asyncio.gather, §5.5)."""
     entities = await _extract_query_entities(query)
     if not entities:
         return ResultatExpert(
@@ -131,9 +132,11 @@ async def run_graph_expert(
 
     chunks: list[ExtraitCite] = []
     if chunk_ids:
-        rows = (
-            await session.execute(select(ChunkRow).where(ChunkRow.id.in_(list(chunk_ids)[:25])))
-        ).scalars().all()
+        factory = session_factory()
+        async with factory() as session:
+            rows = (
+                await session.execute(select(ChunkRow).where(ChunkRow.id.in_(list(chunk_ids)[:25])))
+            ).scalars().all()
         chunks = [
             ExtraitCite(chunk_id=str(r.id), score=1.0, page=r.page, texte=r.text, heading_path=r.heading_path)
             for r in rows

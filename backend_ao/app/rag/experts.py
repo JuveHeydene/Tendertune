@@ -19,6 +19,7 @@ from app.rag.grading import grade_context
 from app.rag.hybrid_retriever import retrieve_dense
 from app.rag.rerank import rerank
 from app.rag.sparse_retriever import retrieve_sparse
+from app.services.db_client import session_factory
 from app.services.ollama_llm import ollama_generate_json
 
 log = logging.getLogger("btp.experts")
@@ -83,6 +84,37 @@ async def _hybrid_pass(
 
 
 async def run_expert(
+    expert: Expert,
+    query: str,
+    *,
+    tenant_id: UUID,
+    dossier_id: UUID | None,
+    message_id: UUID | None,
+    sous_question_index: int,
+    complexite: Complexite,
+) -> ResultatExpert:
+    """Ouvre et gère sa PROPRE session (au lieu d'en recevoir une partagée) :
+    plusieurs experts peuvent ainsi tourner en vrai parallèle via
+    `asyncio.gather` (§1 étape 6, §5.5) sans se disputer une AsyncSession
+    unique — SQLAlchemy AsyncSession n'est pas sûre pour un usage concurrent
+    depuis plusieurs coroutines entrelacées sur le même objet."""
+    factory = session_factory()
+    async with factory() as session:
+        result = await _run_expert_with_session(
+            session,
+            expert,
+            query,
+            tenant_id=tenant_id,
+            dossier_id=dossier_id,
+            message_id=message_id,
+            sous_question_index=sous_question_index,
+            complexite=complexite,
+        )
+        await session.commit()
+        return result
+
+
+async def _run_expert_with_session(
     session: AsyncSession,
     expert: Expert,
     query: str,
