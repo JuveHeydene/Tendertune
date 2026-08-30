@@ -27,6 +27,24 @@ DEFAULT_ARCHETYPE = "factuelle"
 def archetype_for_key(key: str) -> str:
     return ARCHETYPE_BY_KEY.get(key, DEFAULT_ARCHETYPE)
 
+
+_ARCHETYPE_TITLE_MAP: tuple[tuple[tuple[str, ...], str], ...] = (
+    (("présentation", "presentation", "entreprise", "société", "societe"), "institutionnelle"),
+    (("méthod", "method", "organisation", "phasa", "compréhension", "comprehension"), "narrative"),
+    (("qualité", "qualite", "sécurité", "securite", "environnement", "hygiène", "hygiene", "qse"), "conformite"),
+)
+
+
+def archetype_for_title(title: str) -> str:
+    """§9/§10 — classification d'archétype pour un plan extrait dynamiquement
+    (RC atypique) : heuristique par mots-clés du titre, sans appel LLM
+    supplémentaire (même esprit que classify_section_type, §3.1)."""
+    lowered = title.lower()
+    for words, archetype in _ARCHETYPE_TITLE_MAP:
+        if any(w in lowered for w in words):
+            return archetype
+    return DEFAULT_ARCHETYPE
+
 _ALL = (
     "tout le mémoire",
     "tout le memoire",

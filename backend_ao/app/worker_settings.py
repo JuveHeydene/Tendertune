@@ -9,11 +9,14 @@ from app.config import get_settings
 from app.graph.extract import extract_graph
 from app.services.logging_setup import configure_logging
 from app.workers.ingest import ingest_document
+from app.workflow.extract_structure import extract_dossier_structure
 
 
 async def on_startup(ctx: dict) -> None:
     configure_logging()
-    logging.getLogger("btp.ingest").info("worker ARQ prêt — jobs ingest_document + extract_graph")
+    logging.getLogger("btp.ingest").info(
+        "worker ARQ prêt — jobs ingest_document + extract_graph + extract_dossier_structure"
+    )
 
 
 def _redis_settings() -> RedisSettings:
@@ -28,7 +31,7 @@ def _redis_settings() -> RedisSettings:
 
 
 class WorkerSettings:
-    functions = [ingest_document, extract_graph]
+    functions = [ingest_document, extract_graph, extract_dossier_structure]
     redis_settings = _redis_settings()
     max_jobs = 2
     job_timeout = 3600

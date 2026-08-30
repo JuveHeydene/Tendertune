@@ -26,3 +26,14 @@ async def enqueue_ingest(document_id: str) -> str | None:
     job_id = getattr(job, "job_id", None)
     log.info("enqueue ingest_document document_id=%s job_id=%s", document_id, job_id)
     return str(job_id) if job_id else None
+
+
+async def enqueue_extract_structure(dossier_id: str) -> str | None:
+    """§9 — déclenche l'extraction outline/exigences/pièces administratives.
+    Déterministe (comme extract_graph), simplement exposée via un job pour
+    ne pas bloquer une requête HTTP sur un DAO de 200 pages."""
+    redis = await get_queue()
+    job = await redis.enqueue_job("extract_dossier_structure", dossier_id)
+    job_id = getattr(job, "job_id", None)
+    log.info("enqueue extract_dossier_structure dossier_id=%s job_id=%s", dossier_id, job_id)
+    return str(job_id) if job_id else None
