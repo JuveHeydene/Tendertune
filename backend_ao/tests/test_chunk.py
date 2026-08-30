@@ -39,6 +39,23 @@ def test_long_block_multiple_parents_and_children():
     assert sum(len(c.text) for c in parent2_children) >= 10_000 - PARENT_SIZE - CHILD_SIZE
 
 
+def test_empty_pages_returns_empty_list_no_raise():
+    """V2 — image sans texte OCR exploitable (actif visuel, §5.2) :
+    0 chunk est le comportement ATTENDU, pas une erreur."""
+    parsed = ParsedDocument(pages=[], parser="image-actif-visuel", page_count=0)
+    assert chunk_document(parsed) == []
+
+
+def test_blank_pages_present_still_raises():
+    """Si des pages existaient mais sont vides après strip, c'est un échec
+    réel de parse (document cassé), pas un actif visuel volontaire."""
+    import pytest
+
+    parsed = ParsedDocument(pages=[ParsedPage(page=1, text="   ")])
+    with pytest.raises(ValueError):
+        chunk_document(parsed)
+
+
 def test_medium_block_one_parent_many_children():
     text = "b" * 5000
     parsed = ParsedDocument(pages=[ParsedPage(page=2, text=text)])

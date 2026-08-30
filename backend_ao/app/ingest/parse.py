@@ -47,10 +47,54 @@ def parse_file(path: str, filename: str, mime: str | None) -> ParsedDocument:
         log.info("route parse → PDF (%s)", filename)
         return _parse_pdf(path)
 
+    if suffix in IMAGE_SUFFIXES:
+        return _parse_image(path, filename)
+
     text = Path(path).read_text(encoding="utf-8", errors="replace")
     if not text.strip():
         raise ValueError(f"Format non géré : {filename}")
     return ParsedDocument(pages=[ParsedPage(1, text)], parser="fallback-text", page_count=1)
+
+
+IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".tiff", ".tif", ".webp"}
+
+# Seuil identique à PDF_TEXT_MIN_CHARS_PER_PAGE : en dessous, l'image est
+# traitée comme un ACTIF VISUEL (photo de chantier, logo) et non comme un
+# document texte scanné. Ce n'est PAS un échec d'ingestion (§5.2,
+# Nouvelle_Architecture/base_de_donnees_et_interface.md) : le document passe
+# quand même à status="ready", simplement avec 0 chunk — il reste attachable
+# à un export DOCX (SectionGeneree.blocs[].type="image") mais jamais indexé
+# en texte / cherché en RAG.
+IMAGE_TEXT_MIN_CHARS = 40
+
+
+def _parse_image(path: str, filename: str) -> ParsedDocument:
+    """Image uploadée directement (pas une page de PDF rasterisée).
+
+    Bug V1 corrigé ici : le moteur OCR (_try_paddle → _paddle_run) savait déjà
+    traiter une image en entrée directe (branche `else` de _paddle_run, qui
+    traite le fichier comme une page unique sans rasterisation) — seul le
+    routage de parse_file() ne reconnaissait aucun format image et levait
+    `ValueError("Format non géré")`. Voir Diagramme 1, Nouvelle_Architecture/
+    diagrammes_sequence_v2.txt.
+    """
+    log.info("route parse → image directe (%s)", filename)
+    parsed = _try_paddle(path)
+    if parsed is None or not parsed.pages:
+        log.info("Image sans texte OCR exploitable (%s) — actif visuel", filename)
+        return ParsedDocument(pages=[], parser="image-actif-visuel", page_count=0)
+
+    total_chars = sum(len(p.text) for p in parsed.pages)
+    if total_chars < IMAGE_TEXT_MIN_CHARS:
+        log.info(
+            "Image avec peu de texte (%d car. < %d) (%s) — actif visuel",
+            total_chars,
+            IMAGE_TEXT_MIN_CHARS,
+            filename,
+        )
+        return ParsedDocument(pages=[], parser="image-actif-visuel", page_count=0)
+
+    return parsed
 
 
 def _parse_docx(path: str) -> ParsedDocument:

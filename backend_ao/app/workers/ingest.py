@@ -12,6 +12,7 @@ from sqlalchemy import select
 
 from app.config import get_settings
 from app.ingest.chunk import chunk_document
+from app.ingest.classify_section import classify_section_type
 from app.ingest.index_qdrant import embed_texts, ensure_collection, upsert_chunks
 from app.ingest.parse import parse_file
 from app.models.sql import ChunkRow, Document
@@ -88,7 +89,29 @@ async def ingest_document(ctx: dict, document_id: str) -> str:
             for row in existing:
                 await session.delete(row)
             await session.flush()
+
+            # [C2] Classification section_type — UNE fois par parent (§3.1),
+            # propagée à ses enfants (le filtre expert s'applique aux enfants,
+            # même granularité que le dense/sparse — §4.4). Annexes exclues :
+            # pas de section_type utile pour une pièce d'appoint ponctuelle.
+            log.info("[C2] CLASSIFICATION section_type DÉBUT")
+            section_type_by_parent: dict = {}
+            if doc.doc_role != "annexe":
+                for d in drafts:
+                    if d.parent_id is not None:
+                        continue
+                    value, method = classify_section_type(d.heading_path, d.text)
+                    section_type_by_parent[d.id] = value
+                    d.extra = {**(d.extra or {}), "section_type_method": method}
+            n_classified = sum(1 for v in section_type_by_parent.values() if v)
+            log.info(
+                "[C2] CLASSIFICATION FIN — %s/%s parents classés",
+                n_classified,
+                len(section_type_by_parent),
+            )
+
             for d in drafts:
+                parent_key = d.id if d.parent_id is None else d.parent_id
                 session.add(
                     ChunkRow(
                         id=d.id,
@@ -99,41 +122,48 @@ async def ingest_document(ctx: dict, document_id: str) -> str:
                         page=d.page,
                         token_count=d.token_count,
                         extra=d.extra,
+                        section_type=section_type_by_parent.get(parent_key),
                     )
                 )
             await session.flush()
             log.info("[D] POSTGRES CHUNKS FIN — %s lignes en base — on passe à Ollama (embeddings)", len(drafts))
 
             embeddable = [d for d in drafts if d.parent_id is not None] or drafts
-            log.info(
-                "[E] OLLAMA EMBEDDINGS DÉBUT model=%s url=%s n_textes=%s",
-                settings.embed_model,
-                settings.ollama_base_url,
-                len(embeddable),
-            )
-            vectors = embed_texts([_embed_text(d, doc.doc_type) for d in embeddable])
-            log.info(
-                "[E] OLLAMA EMBEDDINGS FIN — %s vecteurs dim=%s — on passe à Qdrant",
-                len(vectors),
-                len(vectors[0]) if vectors else 0,
-            )
+            if not embeddable:
+                # Actif visuel (image sans texte OCR exploitable, §5.2) : 0 chunk,
+                # rien à embedder ni à indexer — on ne sollicite pas Ollama/Qdrant
+                # pour rien. Le document reste "ready" (voir plus bas).
+                log.info("[E/F] Aucun chunk à indexer (actif visuel) — Ollama/Qdrant sautés")
+            else:
+                log.info(
+                    "[E] OLLAMA EMBEDDINGS DÉBUT model=%s url=%s n_textes=%s",
+                    settings.embed_model,
+                    settings.ollama_base_url,
+                    len(embeddable),
+                )
+                vectors = embed_texts([_embed_text(d, doc.doc_type) for d in embeddable])
+                log.info(
+                    "[E] OLLAMA EMBEDDINGS FIN — %s vecteurs dim=%s — on passe à Qdrant",
+                    len(vectors),
+                    len(vectors[0]) if vectors else 0,
+                )
 
-            log.info(
-                "[F] QDRANT DÉBUT collection=%s url=%s points=%s",
-                settings.qdrant_collection,
-                settings.qdrant_url,
-                len(embeddable),
-            )
-            client = ensure_collection()
-            upsert_chunks(
-                client=client,
-                tenant_id=doc.tenant_id,
-                document_id=doc.id,
-                doc_role=doc.doc_role,
-                chunks=embeddable,
-                vectors=vectors,
-            )
-            log.info("[F] QDRANT FIN — vecteurs stockés")
+                log.info(
+                    "[F] QDRANT DÉBUT collection=%s url=%s points=%s",
+                    settings.qdrant_collection,
+                    settings.qdrant_url,
+                    len(embeddable),
+                )
+                client = ensure_collection()
+                upsert_chunks(
+                    client=client,
+                    tenant_id=doc.tenant_id,
+                    document_id=doc.id,
+                    doc_role=doc.doc_role,
+                    chunks=embeddable,
+                    vectors=vectors,
+                )
+                log.info("[F] QDRANT FIN — vecteurs stockés")
 
             doc.ocr_used = parsed.ocr_used
             doc.ocr_confidence = parsed.ocr_confidence

@@ -27,8 +27,14 @@ def chunk_document(parsed: ParsedDocument) -> list[ChunkDraft]:
     out: list[ChunkDraft] = []
     for block in parsed.pages:
         out.extend(_chunk_block(block))
-    if not out:
+    if not out and parsed.pages:
+        # Des pages existaient mais aucune n'a produit de texte exploitable :
+        # signal d'échec réel (parse cassé), pas un actif visuel volontaire.
         raise ValueError("Aucun chunk produit")
+    # parsed.pages == [] (ex. image sans texte OCR, cf. parse._parse_image) :
+    # 0 chunk est le comportement ATTENDU, pas une erreur — le document reste
+    # "ready" en tant qu'actif visuel (Nouvelle_Architecture/
+    # base_de_donnees_et_interface.md §5.2).
     return out
 
 

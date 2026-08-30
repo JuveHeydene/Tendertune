@@ -146,9 +146,14 @@ async def extract_graph(ctx: dict, document_id: str) -> str:
             )
         ).scalars().all()
 
-        to_do = parents[:12]
+        # V2 — bug corrigé : plus de limite à 12 parents (Fichier/comprehension
+        # personnele du projets.md l'identifiait déjà comme une vraie
+        # limitation, reprise en §9 de architecture_agentique_retrieval_
+        # generation.md). Une exigence ou une entité peut être n'importe où
+        # dans le document — on ne peut pas se permettre d'en rater.
+        to_do = parents
         log.info(
-            "GRAPH Ollama+Neo4j : %s parents en base, on traite %s, llm=%s",
+            "GRAPH Ollama+Neo4j : %s parents en base, on traite %s (sans limite), llm=%s",
             len(parents),
             len(to_do),
             get_settings().llm_model,
