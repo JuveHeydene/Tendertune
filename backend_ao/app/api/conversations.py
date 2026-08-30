@@ -6,7 +6,7 @@ import logging
 from datetime import UTC, datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import exists, select
@@ -296,11 +296,17 @@ async def delete_conversation(
 async def upload_conversation_document(
     conversation_id: UUID,
     file: UploadFile = File(...),
+    role: str = Form("annexe"),
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
+    """§1.5/§3.7 — bug V1 corrigé : le doc_role n'est plus figé à
+    "patrimoine". Choix explicite depuis le front (`role`), défaut "annexe"
+    (le moins engageant) si la conversation est liée à un dossier."""
     if user.role == "consultant":
         raise HTTPException(status_code=403, detail="Le consultant ne dépose pas de pièces")
+    if role not in ("annexe", "patrimoine"):
+        raise HTTPException(status_code=400, detail="role doit être 'annexe' ou 'patrimoine'")
     conv = await _load_conv(session, conversation_id, user)
     data = await file.read()
     if not data:
@@ -310,15 +316,20 @@ async def upload_conversation_document(
     if can_write(user) and dossier_id is None:
         doss = await ensure_dossier(session, conv, user)
         dossier_id = doss.id
+
+    # "annexe" n'a de sens que scopé à un dossier — sans dossier, retombe
+    # sur "patrimoine" (rien à scoper, §1.5).
+    effective_role = role if (role == "patrimoine" or dossier_id is not None) else "patrimoine"
     doc, duplicate = await store_document(
         session,
         user,
         data,
         filename,
-        doc_role="patrimoine",
-        doc_type="reference",
+        doc_role=effective_role,
+        doc_type="reference" if effective_role == "patrimoine" else None,
         content_type=file.content_type,
-        dossier_origine_id=dossier_id,
+        dossier_origine_id=dossier_id if effective_role == "patrimoine" else None,
+        dossier_id=dossier_id if effective_role == "annexe" else None,
     )
     note = (
         f"Document déjà indexé : {filename}"
@@ -340,6 +351,7 @@ async def upload_conversation_document(
                 "filename": filename,
                 "duplicate": duplicate,
                 "doc_status": doc.status,
+                "doc_role": effective_role,
             },
         )
     )

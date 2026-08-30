@@ -12,6 +12,7 @@ const LABELS: { key: keyof DocItem; label: string }[] = [
   { key: 'doc_type', label: 'doc_type' },
   { key: 'is_dao', label: 'is_dao' },
   { key: 'dossier_origine_id', label: 'dossier_origine_id' },
+  { key: 'dossier_id', label: 'dossier_id (annexe)' },
   { key: 'status', label: 'status' },
   { key: 'graph_extracted', label: 'graph_extracted' },
   { key: 'ingest_error', label: 'ingest_error' },
@@ -38,6 +39,14 @@ function statusClass(status: string): string {
   if (status === 'processing' || status === 'pending') return 'doc-badge doc-badge--live'
   if (status === 'failed') return 'doc-badge doc-badge--failed'
   return 'doc-badge'
+}
+
+// §3.7 — le sélecteur devient descriptif : chaque rôle explique sa
+// conséquence sur le retrieval plutôt que de laisser l'utilisateur deviner.
+const ROLE_HINTS: Record<string, string> = {
+  patrimoine: "Visible et cherché dans TOUS les futurs dossiers de l'entreprise. Réservé aux documents de référence validés.",
+  dao_courant: "Le DAO de la consultation en cours — sert à extraire les exigences et le plan (§9).",
+  dao_archive: 'Un ancien DAO conservé pour référence, cherché comme le patrimoine.',
 }
 
 function formatBytes(n: number | null | undefined): string {
@@ -245,7 +254,7 @@ export function DocumentsPage() {
       {canUpload ? (
         <form className="card-form docs-upload" onSubmit={onUpload}>
           <div className="docs-upload-main">
-            <input type="file" name="file" required />
+            <input type="file" name="file" required accept=".pdf,.docx,.xlsx,.txt,.md,.jpg,.jpeg,.png,.tiff,.webp" />
             <select value={role} onChange={(e) => setRole(e.target.value)}>
               <option value="patrimoine">Patrimoine (références)</option>
               <option value="dao_courant">DAO courant</option>
@@ -260,8 +269,14 @@ export function DocumentsPage() {
               <option value="reference">Référence</option>
               <option value="dpgf">DPGF</option>
               <option value="bpu">BPU</option>
+              <option value="administratif">Administratif (KBIS, attestations…)</option>
             </select>
           </div>
+          <p className="muted docs-upload-hint">ⓘ {ROLE_HINTS[role]}</p>
+          <p className="muted docs-upload-hint">
+            Pour joindre un document à UN dossier précis sans l'ajouter au patrimoine, utilisez l'onglet «
+            Documents » de la page de ce dossier (Dossiers → ouvrir → Documents).
+          </p>
           <button className="btn-primary" disabled={busy} type="submit">
             {busy ? 'Envoi…' : 'Déposer dans MinIO'}
           </button>

@@ -164,6 +164,8 @@ export function ConversationThread() {
   const [exportFmt, setExportFmt] = useState<ExportFormat>('docx')
   const [previewOpen, setPreviewOpen] = useState(false)
   const [attachJob, setAttachJob] = useState<AttachJob | null>(null)
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [pendingRole, setPendingRole] = useState<'annexe' | 'patrimoine'>('annexe')
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   function applyPreview(c: Conversation, keepPreviousIfEmpty = false) {
@@ -304,10 +306,24 @@ export function ConversationThread() {
     }
   }
 
-  async function onAttach(file: File) {
+  function onFileSelected(file: File) {
+    // §1.5/§3.7 — le choix annexe/patrimoine n'a de sens QUE si cette
+    // conversation est déjà liée à un dossier (sinon rien à scoper) : dans
+    // ce cas, on demande explicitement plutôt que de figer le rôle en
+    // silence (c'était le bug V1 : doc_role toujours "patrimoine").
+    if (conv?.dossier_id) {
+      setPendingRole('annexe')
+      setPendingFile(file)
+      return
+    }
+    void onAttach(file, 'patrimoine')
+  }
+
+  async function onAttach(file: File, role: 'annexe' | 'patrimoine') {
     if (busy || attachJob?.phase === 'uploading' || attachJob?.phase === 'processing') return
     if (user?.role === 'consultant') return
     setError(null)
+    setPendingFile(null)
     setAttachJob({ documentId: '', filename: file.name, phase: 'uploading', status: 'upload' })
     let convId = id
     try {
@@ -319,7 +335,7 @@ export function ConversationThread() {
         navigate(`/app/conversations/${created.id}`, { replace: true })
       }
 
-      const next = await convApi.uploadDocument(convId!, file)
+      const next = await convApi.uploadDocument(convId!, file, role)
       setConv(next)
       await refreshList()
 
@@ -405,6 +421,56 @@ export function ConversationThread() {
 
         <div className="conv-chat-scroll">
           <div className="messages">
+            {pendingFile ? (
+              <article className="attach-choice" aria-live="polite">
+                <p className="attach-status-title">📎 {pendingFile.name}</p>
+                <p className="muted">Comment utiliser ce document ?</p>
+                <label className="attach-choice-option">
+                  <input
+                    type="radio"
+                    name="attach-role"
+                    checked={pendingRole === 'annexe'}
+                    onChange={() => setPendingRole('annexe')}
+                  />
+                  <span>
+                    <strong>Aide ponctuelle pour ce dossier uniquement</strong>
+                    <br />
+                    <span className="muted">
+                      Sert à vous aider à rédiger ce dossier. Invisible depuis les autres dossiers, non
+                      conservé dans le patrimoine.
+                    </span>
+                  </span>
+                </label>
+                <label className="attach-choice-option">
+                  <input
+                    type="radio"
+                    name="attach-role"
+                    checked={pendingRole === 'patrimoine'}
+                    onChange={() => setPendingRole('patrimoine')}
+                  />
+                  <span>
+                    <strong>Ajouter au patrimoine de l'entreprise</strong>
+                    <br />
+                    <span className="muted">
+                      Utilisable pour TOUS les futurs dossiers. À réserver aux documents de référence
+                      validés (méthodo, certifications, CV...).
+                    </span>
+                  </span>
+                </label>
+                <div className="attach-choice-actions">
+                  <button type="button" className="btn-ghost" onClick={() => setPendingFile(null)}>
+                    Annuler
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={() => onAttach(pendingFile, pendingRole)}
+                  >
+                    Confirmer
+                  </button>
+                </div>
+              </article>
+            ) : null}
             {attachJob ? (
               <article
                 className={`attach-status attach-status--${attachJob.phase}`}
@@ -490,7 +556,7 @@ export function ConversationThread() {
                   disabled={composerLocked}
                   onChange={(e) => {
                     const f = e.target.files?.[0]
-                    if (f) void onAttach(f)
+                    if (f) onFileSelected(f)
                   }}
                 />
                 <button

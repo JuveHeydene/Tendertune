@@ -414,6 +414,46 @@ async def review_section(
 
 
 # ---------------------------------------------------------------------------
+# Historique (§3.6) — reviews + versions
+# ---------------------------------------------------------------------------
+
+
+class ReviewOut(BaseModel):
+    id: UUID
+    version: int
+    action: str
+    comment: str | None
+    created_at: str
+
+
+@router.get("/{dossier_id}/sections/{section_key}/historique", response_model=list[ReviewOut])
+async def section_historique(
+    dossier_id: UUID,
+    section_key: str,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    doss = await _get_owned_dossier(session, dossier_id, user)
+    gens = (
+        await session.execute(
+            select(Generation)
+            .where(Generation.dossier_id == doss.id, Generation.section_key == section_key)
+            .order_by(Generation.version)
+        )
+    ).scalars().all()
+    out: list[ReviewOut] = []
+    for gen in gens:
+        reviews = (
+            await session.execute(select(Review).where(Review.generation_id == gen.id).order_by(Review.created_at))
+        ).scalars().all()
+        for r in reviews:
+            out.append(
+                ReviewOut(id=r.id, version=gen.version, action=r.action, comment=r.comment, created_at=r.created_at.isoformat())
+            )
+    return out
+
+
+# ---------------------------------------------------------------------------
 # Pièces administratives (§5.3)
 # ---------------------------------------------------------------------------
 

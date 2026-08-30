@@ -64,6 +64,7 @@ export type DocItem = {
   doc_type: string | null
   is_dao: boolean
   dossier_origine_id: string | null
+  dossier_id: string | null
   status: string
   graph_extracted: boolean
   ingest_error: string | null
@@ -119,6 +120,60 @@ export type Dossier = {
   status: string
   deadline: string | null
   current_version?: number | null
+  exigences_total: number
+  exigences_couvertes: number
+  exigences_eliminatoires_non_couvertes: number
+  sections_total: number
+  sections_approuvees: number
+}
+
+export type Exigence = {
+  id: string
+  libelle: string
+  type: string
+  obligatoire: boolean
+  statut: 'a_couvrir' | 'en_cours' | 'couverte' | 'non_couverte' | 'a_revoir'
+  reference_dao: string | null
+  page_source: number | null
+  preuves_chunks: string[]
+}
+
+export type OutlineItemApi = {
+  id: string
+  key: string
+  title: string
+  heading_level: number
+  sort_order: number
+  status: 'todo' | 'generated' | 'approved' | 'rejected'
+  archetype: 'institutionnelle' | 'factuelle' | 'narrative' | 'conformite'
+}
+
+export type SectionDetail = {
+  section_key: string
+  title: string
+  status: string
+  version: number | null
+  markdown: string | null
+  citations: unknown[]
+  abstentions: string[]
+  exigences_couvertes: string[]
+}
+
+export type ReviewApi = {
+  id: string
+  version: number
+  action: 'approve' | 'edit' | 'regen'
+  comment: string | null
+  created_at: string
+}
+
+export type DossierPieceApi = {
+  id: string
+  libelle: string
+  obligatoire: boolean
+  statut: 'manquant' | 'trouve_patrimoine' | 'a_uploader' | 'fourni'
+  document_id: string | null
+  source: 'rc' | 'standard'
 }
 
 const TOKEN_KEY = 'btp_ao_token'
@@ -202,15 +257,18 @@ export const adminApi = {
 }
 
 export const docsApi = {
-  list: () => request<DocItem[]>('/documents'),
+  list: (dossierId?: string) =>
+    request<DocItem[]>(dossierId ? `/documents?dossier_id=${dossierId}` : '/documents'),
   get: (id: string) => request<DocItem>(`/documents/${id}`),
-  upload: (file: File, docRole: string, docType: string) => {
+  upload: (file: File, docRole: string, docType: string, dossierId?: string) => {
     const fd = new FormData()
     fd.append('file', file)
     fd.append('doc_role', docRole)
     if (docType) fd.append('doc_type', docType)
+    if (docRole === 'annexe' && dossierId) fd.append('dossier_id', dossierId)
     return request<DocItem>('/documents', { method: 'POST', body: fd })
   },
+  promote: (id: string) => request<DocItem>(`/documents/${id}/promouvoir`, { method: 'POST' }),
   remove: (id: string) => request<void>(`/documents/${id}`, { method: 'DELETE' }),
 }
 
@@ -246,9 +304,10 @@ export const convApi = {
       body: JSON.stringify({ title }),
     }),
   remove: (id: string) => request<void>(`/conversations/${id}`, { method: 'DELETE' }),
-  uploadDocument: (id: string, file: File) => {
+  uploadDocument: (id: string, file: File, role: 'annexe' | 'patrimoine' = 'annexe') => {
     const fd = new FormData()
     fd.append('file', file)
+    fd.append('role', role)
     return request<Conversation>(`/conversations/${id}/documents`, { method: 'POST', body: fd })
   },
   send: (id: string, text: string) =>
@@ -349,3 +408,39 @@ export async function downloadDossierExport(dossierId: string, format: ExportFor
 
 /** @deprecated use downloadDossierExport */
 export const downloadDossierDocx = (id: string) => downloadDossierExport(id, 'docx')
+
+export const dossierApi = {
+  get: (id: string) => request<Dossier>(`/dossiers/${id}`),
+  analyser: (id: string) => request<{ dossier_id: string; status: string; job_id: string | null }>(
+    `/dossiers/${id}/analyser`,
+    { method: 'POST' },
+  ),
+  exigences: (id: string) => request<Exigence[]>(`/dossiers/${id}/exigences`),
+  relancerRechercheExigence: (dossierId: string, exigenceId: string) =>
+    request<{ exigence_id: string; status: string }>(
+      `/dossiers/${dossierId}/exigences/${exigenceId}/recherche`,
+      { method: 'POST' },
+    ),
+  outline: (id: string) => request<OutlineItemApi[]>(`/dossiers/${id}/outline`),
+  getSection: (dossierId: string, sectionKey: string) =>
+    request<SectionDetail>(`/dossiers/${dossierId}/sections/${sectionKey}`),
+  generateSection: (dossierId: string, sectionKey: string) =>
+    request<SectionDetail>(`/dossiers/${dossierId}/sections/${sectionKey}/generate`, { method: 'POST' }),
+  reviewSection: (
+    dossierId: string,
+    sectionKey: string,
+    body: { action: 'approve' | 'edit' | 'regen'; text?: string; comment?: string },
+  ) =>
+    request<{ dossier_id: string; section_key: string; action: string; status: string }>(
+      `/dossiers/${dossierId}/sections/${sectionKey}/review`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+  historique: (dossierId: string, sectionKey: string) =>
+    request<ReviewApi[]>(`/dossiers/${dossierId}/sections/${sectionKey}/historique`),
+  pieces: (id: string) => request<DossierPieceApi[]>(`/dossiers/${id}/pieces`),
+  choisirPiece: (dossierId: string, pieceId: string, documentId: string) =>
+    request<{ piece_id: string; statut: string }>(`/dossiers/${dossierId}/pieces/${pieceId}/choisir`, {
+      method: 'POST',
+      body: JSON.stringify({ document_id: documentId }),
+    }),
+}

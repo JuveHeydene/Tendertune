@@ -28,6 +28,7 @@ async def store_document(
     doc_type: str | None,
     content_type: str | None = None,
     dossier_origine_id: UUID | None = None,
+    dossier_id: UUID | None = None,
 ) -> tuple[Document, bool]:
     """Retourne (document, duplicate)."""
     digest = sha256(data).hexdigest()
@@ -58,6 +59,9 @@ async def store_document(
         doc_type=doc_type,
         is_dao=doc_role in ("dao_courant", "dao_archive"),
         dossier_origine_id=dossier_origine_id,
+        # V2 — doc_role="annexe" : scope live au dossier (§1.5), distinct de
+        # dossier_origine_id (provenance historique d'un doc de patrimoine).
+        dossier_id=dossier_id,
         status="pending",
         filename=filename,
         size_bytes=len(data),

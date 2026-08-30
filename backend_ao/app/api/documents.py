@@ -19,8 +19,8 @@ log = logging.getLogger("btp.upload")
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
-DOC_ROLES = ("patrimoine", "dao_courant", "dao_archive")
-DOC_TYPES = ("rc", "cctp", "ccap", "memoire", "reference", "dpgf", "bpu", "autre")
+DOC_ROLES = ("patrimoine", "dao_courant", "dao_archive", "annexe")
+DOC_TYPES = ("rc", "cctp", "ccap", "memoire", "reference", "dpgf", "bpu", "administratif", "autre")
 
 
 class DocumentOut(BaseModel):
@@ -32,6 +32,7 @@ class DocumentOut(BaseModel):
     doc_type: str | None
     is_dao: bool
     dossier_origine_id: UUID | None
+    dossier_id: UUID | None = None
     status: str
     graph_extracted: bool
     ingest_error: str | None
@@ -58,6 +59,7 @@ def _out(d: Document, *, duplicate: bool = False) -> DocumentOut:
         doc_type=d.doc_type,
         is_dao=d.is_dao,
         dossier_origine_id=d.dossier_origine_id,
+        dossier_id=d.dossier_id,
         status=d.status,
         graph_extracted=d.graph_extracted,
         ingest_error=d.ingest_error,
@@ -77,16 +79,16 @@ def _out(d: Document, *, duplicate: bool = False) -> DocumentOut:
 
 @router.get("", response_model=list[DocumentOut])
 async def list_documents(
+    dossier_id: UUID | None = None,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    rows = (
-        await session.execute(
-            select(Document)
-            .where(Document.tenant_id == user.tenant_id)
-            .order_by(Document.created_at.desc())
-        )
-    ).scalars().all()
+    """`dossier_id` : filtre optionnel — utilisé par l'onglet "Documents" de
+    la page dossier (annexes scopées, §3.2/§3.7)."""
+    stmt = select(Document).where(Document.tenant_id == user.tenant_id)
+    if dossier_id is not None:
+        stmt = stmt.where(Document.dossier_id == dossier_id)
+    rows = (await session.execute(stmt.order_by(Document.created_at.desc()))).scalars().all()
     return [_out(d) for d in rows]
 
 
@@ -95,6 +97,7 @@ async def upload_document(
     file: UploadFile = File(...),
     doc_role: str = Form("patrimoine"),
     doc_type: str | None = Form(None),
+    dossier_id: UUID | None = Form(None),
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
@@ -102,6 +105,8 @@ async def upload_document(
         raise HTTPException(status_code=400, detail="doc_role invalide")
     if doc_type and doc_type not in DOC_TYPES:
         raise HTTPException(status_code=400, detail="doc_type invalide")
+    if doc_role == "annexe" and dossier_id is None:
+        raise HTTPException(status_code=400, detail="doc_role='annexe' nécessite dossier_id (§1.5)")
     if user.role == "consultant":
         raise HTTPException(status_code=403, detail="Le consultant ne dépose pas de pièces")
 
@@ -109,13 +114,14 @@ async def upload_document(
     if not data:
         raise HTTPException(status_code=400, detail="Fichier vide")
     log.info(
-        "UPLOAD start user=%s fichier=%s octets=%s rôle=%s type=%s mime=%s",
+        "UPLOAD start user=%s fichier=%s octets=%s rôle=%s type=%s mime=%s dossier=%s",
         user.email,
         file.filename,
         len(data),
         doc_role,
         doc_type,
         file.content_type,
+        dossier_id,
     )
     filename = file.filename or "document.bin"
     doc, duplicate = await store_document(
@@ -126,6 +132,7 @@ async def upload_document(
         doc_role=doc_role,
         doc_type=doc_type,
         content_type=file.content_type,
+        dossier_id=dossier_id if doc_role == "annexe" else None,
     )
     if duplicate:
         log.info("UPLOAD doublon id=%s statut=%s", doc.id, doc.status)
@@ -145,6 +152,34 @@ async def get_document(
     doc = await session.get(Document, document_id)
     if doc is None or doc.tenant_id != user.tenant_id:
         raise HTTPException(status_code=404, detail="Document introuvable")
+    return _out(doc)
+
+
+@router.post("/{document_id}/promouvoir", response_model=DocumentOut)
+async def promouvoir_document(
+    document_id: UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """§1.5 — promotion annexe → patrimoine. Réutilise `dossier_origine_id`,
+    déjà prévu en V1 pour exactement ce rôle (provenance historique)."""
+    if user.role == "consultant":
+        raise HTTPException(status_code=403, detail="Action réservée au rédacteur, manager ou admin")
+    doc = await session.get(Document, document_id)
+    if doc is None or doc.tenant_id != user.tenant_id:
+        raise HTTPException(status_code=404, detail="Document introuvable")
+    if doc.doc_role != "annexe":
+        raise HTTPException(status_code=400, detail="Seule une annexe peut être promue")
+    doc.doc_role = "patrimoine"
+    doc.dossier_origine_id = doc.dossier_id
+    doc.dossier_id = None
+    await session.commit()
+    await session.refresh(doc)
+    if not doc.graph_extracted:
+        from app.services.queue import get_queue
+
+        redis = await get_queue()
+        await redis.enqueue_job("extract_graph", str(doc.id))
     return _out(doc)
 
 

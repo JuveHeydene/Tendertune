@@ -12,6 +12,7 @@ import { SessionsPage } from './pages/admin/SessionsPage'
 import { DocumentsPage } from './pages/DocumentsPage'
 import { ConversationThread } from './pages/ConversationsPage'
 import { DossiersPage } from './pages/DossiersPage'
+import { DossierDetailPage } from './pages/DossierDetailPage'
 import type { Role } from './api/client'
 
 function RoleGate({ role, children }: { role: Role; children: ReactNode }) {
@@ -103,6 +104,7 @@ export default function App() {
           />
           <Route path="documents" element={<DocumentsPage />} />
           <Route path="dossiers" element={<DossiersPage />} />
+          <Route path="dossiers/:id" element={<DossierDetailPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
