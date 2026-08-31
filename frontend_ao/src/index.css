@@ -437,6 +437,18 @@ input:focus {
   font-weight: 550;
 }
 
+/* V2 — tuiles cliquables du tableau de bord (renvoient vers /app/dossiers) */
+.tile--link {
+  display: block;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.tile--link:hover {
+  border-color: var(--violet);
+  transform: translateY(-2px);
+}
+
 .two-col {
   display: grid;
   grid-template-columns: 1fr 1fr;

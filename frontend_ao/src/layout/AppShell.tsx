@@ -15,6 +15,10 @@ const NAV: Record<Role, { to: string; label: string; end?: boolean }[]> = {
     { to: '/app/admin/users', label: 'Utilisateurs' },
     { to: '/app/admin/tenants', label: 'Tenants' },
     { to: '/app/admin/sessions', label: 'Sessions' },
+    // Manquait — trouvé en vérifiant la navigation réelle : sans ce lien,
+    // aucune page dossier (liste ou détail 5 onglets) n'était joignable
+    // pour ce rôle, seulement par URL directe.
+    { to: '/app/dossiers', label: 'Dossiers AO' },
     { to: '/app/documents', label: 'Documents' },
     { to: '/app/conversations', label: 'Conversations' },
   ],

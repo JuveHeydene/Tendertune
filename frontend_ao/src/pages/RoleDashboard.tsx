@@ -82,16 +82,29 @@ export function RoleDashboard() {
       </header>
       {error ? <p className="form-error">{error}</p> : null}
       <section className="tiles">
-        {meta.tiles.map((t, i) => (
-          <article
-            key={t.label}
-            className="tile tile--enter"
-            style={{ animationDelay: `${i * 70}ms` }}
-          >
-            <p>{t.label}</p>
-            <strong>{data ? data[t.key] : '—'}</strong>
-          </article>
-        ))}
+        {meta.tiles.map((t, i) => {
+          const linkable = t.key === 'dossiers' || t.key === 'dossiers_en_cours'
+          const content = (
+            <>
+              <p>{t.label}</p>
+              <strong>{data ? data[t.key] : '—'}</strong>
+            </>
+          )
+          return linkable ? (
+            <Link
+              key={t.label}
+              to="/app/dossiers"
+              className="tile tile--enter tile--link"
+              style={{ animationDelay: `${i * 70}ms` }}
+            >
+              {content}
+            </Link>
+          ) : (
+            <article key={t.label} className="tile tile--enter" style={{ animationDelay: `${i * 70}ms` }}>
+              {content}
+            </article>
+          )
+        })}
       </section>
       {data && data.exports_count > 0 ? (
         <p className="dash-exports-hint muted">
@@ -110,11 +123,29 @@ export function RoleDashboard() {
       </section>
       <section className="offer-empty panel">
         <p className="eyebrow">Portefeuille d’offres</p>
-        <h2>Aucun dossier ouvert pour l’instant</h2>
-        <p className="muted">
-          Un dossier = un DAO, des exigences à couvrir, un mémoire technique généré depuis le
-          patrimoine, puis une revue avant export Word.
-        </p>
+        {data && data.dossiers > 0 ? (
+          <>
+            <h2>
+              {data.dossiers} dossier{data.dossiers > 1 ? 's' : ''}
+              {data.dossiers_en_cours > 0 ? ` · ${data.dossiers_en_cours} en cours` : ''}
+            </h2>
+            <p className="muted">
+              Exigences, plan, sections et revue humaine se gèrent depuis la page de chaque dossier.
+            </p>
+            <Link to="/app/dossiers" className="btn-ghost">
+              Voir les dossiers →
+            </Link>
+          </>
+        ) : (
+          <>
+            <h2>Aucun dossier ouvert pour l’instant</h2>
+            <p className="muted">
+              Un dossier = un DAO, des exigences à couvrir, un mémoire technique généré depuis le
+              patrimoine, puis une revue avant export Word. Il se crée automatiquement dès qu'une
+              conversation génère une première section.
+            </p>
+          </>
+        )}
       </section>
       <section className="two-col">
         <article className="panel">
