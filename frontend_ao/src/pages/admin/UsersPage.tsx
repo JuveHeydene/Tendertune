@@ -16,6 +16,11 @@ export function UsersPage() {
     first_name: '',
     last_name: '',
   })
+  const [resetTarget, setResetTarget] = useState<ManagedUser | null>(null)
+  const [newPassword, setNewPassword] = useState('')
+  const [resetBusy, setResetBusy] = useState(false)
+  const [resetError, setResetError] = useState<string | null>(null)
+  const [resetOk, setResetOk] = useState<string | null>(null)
 
   async function refresh() {
     const [u, t] = await Promise.all([adminApi.users(), adminApi.tenants()])
@@ -48,6 +53,29 @@ export function UsersPage() {
   async function setRole(id: string, role: string) {
     await adminApi.patchUser(id, { role })
     await refresh()
+  }
+
+  function openReset(u: ManagedUser) {
+    setResetTarget(u)
+    setNewPassword('')
+    setResetError(null)
+    setResetOk(null)
+  }
+
+  async function confirmReset(e: FormEvent) {
+    e.preventDefault()
+    if (!resetTarget || newPassword.length < 8) return
+    setResetBusy(true)
+    setResetError(null)
+    try {
+      await adminApi.patchUser(resetTarget.id, { password: newPassword })
+      setResetOk(`Mot de passe changé pour ${resetTarget.email}.`)
+      setNewPassword('')
+    } catch (err) {
+      setResetError(err instanceof Error ? err.message : 'Échec de la réinitialisation')
+    } finally {
+      setResetBusy(false)
+    }
   }
 
   return (
@@ -160,12 +188,66 @@ export function UsersPage() {
                   >
                     Révoquer sessions
                   </button>
+                  <button type="button" className="btn-ghost" onClick={() => openReset(u)}>
+                    Changer le mot de passe
+                  </button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {resetTarget ? (
+        <div
+          className="modal-backdrop"
+          onClick={() => !resetBusy && setResetTarget(null)}
+          role="presentation"
+        >
+          <form
+            className="modal modal--narrow"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reset-pw-title"
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={confirmReset}
+          >
+            <div className="modal-head">
+              <h2 id="reset-pw-title">Changer le mot de passe</h2>
+            </div>
+            <p className="modal-copy">
+              Pour <strong>{resetTarget.email}</strong> — en cas d'oubli. L'utilisateur devra utiliser ce
+              nouveau mot de passe à sa prochaine connexion ; ses sessions actuelles restent valides.
+            </p>
+            {resetOk ? <p className="attach-status-ok">{resetOk}</p> : null}
+            {resetError ? <p className="form-error">{resetError}</p> : null}
+            <label className="field">
+              <span>Nouveau mot de passe (8 caractères min.)</span>
+              <input
+                type="password"
+                value={newPassword}
+                minLength={8}
+                autoFocus
+                disabled={resetBusy}
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
+            </label>
+            <div className="modal-actions">
+              <button type="submit" className="btn-primary" disabled={resetBusy || newPassword.length < 8}>
+                {resetBusy ? 'Enregistrement…' : 'Changer le mot de passe'}
+              </button>
+              <button
+                type="button"
+                className="btn-ghost"
+                disabled={resetBusy}
+                onClick={() => setResetTarget(null)}
+              >
+                Fermer
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
     </div>
   )
 }

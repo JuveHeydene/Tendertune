@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>{{ project_name }}</title>
+<style>
+  @page {
+    size: A4;
+    margin: 2.4cm 2cm 2.2cm 2cm;
+    @top-center {
+      content: string(doctitle);
+      font-family: "Liberation Sans", "DejaVu Sans", Arial, sans-serif;
+      font-size: 8.5pt;
+      color: #8a93a1;
+      letter-spacing: .03em;
+    }
+    @bottom-center {
+      content: "Page " counter(page) " / " counter(pages);
+      font-family: "Liberation Sans", "DejaVu Sans", Arial, sans-serif;
+      font-size: 8.5pt;
+      color: #8a93a1;
+    }
+  }
+  @page cover {
+    margin: 0;
+    @top-center { content: none; }
+    @bottom-center { content: none; }
+  }
+  @page toc {
+    @top-center { content: none; }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Liberation Sans", "DejaVu Sans", Arial, sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.55;
+    color: #22282f;
+  }
+
+  /* ---------- Couverture ---------- */
+  .cover {
+    page: cover;
+    page-break-after: always;
+    height: 297mm;
+    position: relative;
+    background: linear-gradient(150deg, #10233d 0%, #16324f 55%, #1c3d5a 100%);
+    color: #fff;
+  }
+  .cover .accent-bar {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 14px;
+    background: #e08e2b;
+  }
+  .cover .cover-inner {
+    position: absolute;
+    left: 3cm; right: 2.4cm; top: 6.5cm;
+  }
+  .cover .kicker {
+    text-transform: uppercase;
+    letter-spacing: .18em;
+    font-size: 10pt;
+    color: #e08e2b;
+    font-weight: 700;
+    margin-bottom: 0.9cm;
+  }
+  .cover h1 {
+    font-size: 30pt;
+    line-height: 1.25;
+    margin: 0 0 0.6cm 0;
+    font-weight: 700;
+  }
+  .cover .subtitle {
+    font-size: 13pt;
+    color: #c9d4e0;
+    margin-bottom: 3cm;
+  }
+  .cover .meta-table {
+    border-top: 1px solid rgba(255,255,255,.25);
+    padding-top: 0.5cm;
+    font-size: 10pt;
+    color: #dbe3ec;
+  }
+  .cover .meta-table div { margin-bottom: 0.25cm; }
+  .cover .meta-table b { color: #fff; font-weight: 700; }
+  .cover .footer-brand {
+    position: absolute;
+    left: 3cm; bottom: 2cm;
+    font-size: 9pt;
+    color: #8fa2b8;
+    letter-spacing: .05em;
+  }
+
+  /* ---------- Sommaire ---------- */
+  .toc {
+    page: toc;
+    page-break-after: always;
+  }
+  .toc h2 {
+    font-size: 18pt;
+    color: #1c3d5a;
+    border-bottom: 2px solid #e08e2b;
+    padding-bottom: 0.3cm;
+    margin-bottom: 0.8cm;
+  }
+  .toc ol {
+    list-style: none;
+    margin: 0; padding: 0;
+    counter-reset: toc-counter;
+  }
+  .toc li {
+    counter-increment: toc-counter;
+    display: flex;
+    align-items: baseline;
+    padding: 0.28cm 0;
+    border-bottom: 1px dotted #d7dee6;
+    font-size: 11pt;
+  }
+  .toc li::before {
+    content: counter(toc-counter, decimal-leading-zero);
+    color: #e08e2b;
+    font-weight: 700;
+    width: 1.3cm;
+    flex: none;
+  }
+  .toc li .toc-title { flex: 1; color: #22282f; }
+
+  /* ---------- Sections ---------- */
+  .section-block {
+    page-break-before: always;
+  }
+  .section-block h1.section-title {
+    string-set: doctitle content();
+    font-size: 16pt;
+    color: #1c3d5a;
+    border-bottom: 2px solid #e08e2b;
+    padding-bottom: 0.25cm;
+    margin: 0 0 0.6cm 0;
+  }
+  .section-block h2 {
+    font-size: 13pt;
+    color: #1c3d5a;
+    margin: 0.7cm 0 0.3cm 0;
+  }
+  .section-block h3 {
+    font-size: 11.5pt;
+    color: #3a556f;
+    margin: 0.55cm 0 0.25cm 0;
+  }
+  .section-block p { margin: 0 0 0.35cm 0; text-align: justify; }
+  .section-block ul { margin: 0 0 0.4cm 0; padding-left: 0.6cm; }
+  .section-block li { margin-bottom: 0.12cm; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0.35cm 0 0.5cm 0;
+    font-size: 9.5pt;
+  }
+  table th {
+    background: #1c3d5a;
+    color: #fff;
+    text-align: left;
+    padding: 0.2cm 0.3cm;
+  }
+  table td {
+    padding: 0.18cm 0.3cm;
+    border-bottom: 1px solid #e3e8ee;
+  }
+  table tr:nth-child(even) td { background: #f4f7fa; }
+
+  .image-placeholder {
+    border: 1px dashed #b8c2cd;
+    background: #f7f9fb;
+    color: #6a7684;
+    padding: 0.4cm;
+    margin: 0.3cm 0 0.5cm 0;
+    font-size: 9.5pt;
+    border-radius: 3px;
+  }
+
+  .abstentions-box {
+    margin-top: 0.6cm;
+    border-left: 3px solid #e08e2b;
+    background: #fdf5e9;
+    padding: 0.3cm 0.5cm;
+    font-size: 9.5pt;
+    color: #5c4a26;
+  }
+  .abstentions-box strong { color: #a9660c; }
+  .abstentions-box ul { margin: 0.15cm 0 0 0; padding-left: 0.5cm; }
+</style>
+</head>
+<body>
+
+  <div class="cover">
+    <div class="accent-bar"></div>
+    <div class="cover-inner">
+      <div class="kicker">Mémoire technique — Appel d'offres</div>
+      <h1>{{ project_name }}</h1>
+      <div class="subtitle">Réponse technique et méthodologique</div>
+      <div class="meta-table">
+        <div><b>Version</b> — {{ version }}</div>
+        <div><b>Généré le</b> — {{ generated_at }}</div>
+        {% if section_count %}<div><b>Sections</b> — {{ section_count }}</div>{% endif %}
+      </div>
+    </div>
+    <div class="footer-brand">BTP RAG — Plateforme de capitalisation &amp; génération AO</div>
+  </div>
+
+  {% if sections %}
+  <div class="toc">
+    <h2>Sommaire</h2>
+    <ol>
+      {% for section in sections %}
+      <li><span class="toc-title">{{ section.titre }}</span></li>
+      {% endfor %}
+    </ol>
+  </div>
+  {% endif %}
+
+  <div class="content">
+    {% for section in sections %}
+    <section class="section-block">
+      <h1 class="section-title">{{ section.titre }}</h1>
+      {% for block_html in section.blocks_html %}{{ block_html | safe }}{% endfor %}
+      {% if section.abstentions %}
+      <div class="abstentions-box">
+        <strong>⚠️ Points non couverts</strong>
+        <ul>
+          {% for a in section.abstentions %}<li>{{ a }}</li>{% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+    </section>
+    {% endfor %}
+  </div>
+
+</body>
+</html>

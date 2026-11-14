@@ -39,7 +39,9 @@ def rewrite_query(question: str, history: list[dict] | None) -> str:
         return question
     try:
         prompt = _PROMPT.format(history=format_history(history) or "(aucun)", question=question)
-        body = ollama_generate_json(prompt, timeout=60)
+        # num_ctx=4096 : même raison que superviseur.py — l'historique de
+        # conversation peut grandir au-delà du défaut Ollama (2048).
+        body = ollama_generate_json(prompt, timeout=60, num_ctx=4096)
         clean = str(body.get("query_clean") or "").strip()
         if clean:
             return clean

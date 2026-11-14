@@ -3,10 +3,17 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
 from app.config import get_settings
+
+# Rappelé après chaque page OCRisée : (numéro de page, texte, confiance).
+# Permet à l'appelant (app/workers/ingest.py) de persister la progression
+# page par page, pour reprendre après une interruption (timeout de tâche,
+# crash worker) sans refaire les pages déjà traitées.
+OnPageDone = Callable[[int, str, "float | None"], None]
 
 log = logging.getLogger("btp.parse")
 
@@ -29,7 +36,14 @@ class ParsedDocument:
     page_count: int | None = None 
 
 
-def parse_file(path: str, filename: str, mime: str | None) -> ParsedDocument:
+def parse_file(
+    path: str,
+    filename: str,
+    mime: str | None,
+    *,
+    resume_progress: dict | None = None,
+    on_page_done: OnPageDone | None = None,
+) -> ParsedDocument:
     suffix = Path(filename).suffix.lower()
     raw = Path(path).read_bytes()[:8]
 
@@ -45,7 +59,7 @@ def parse_file(path: str, filename: str, mime: str | None) -> ParsedDocument:
         return ParsedDocument(pages=[ParsedPage(1, text)], parser="plaintext", page_count=1)
     if suffix == ".pdf" or raw.startswith(b"%PDF"):
         log.info("route parse → PDF (%s)", filename)
-        return _parse_pdf(path)
+        return _parse_pdf(path, resume_progress=resume_progress, on_page_done=on_page_done)
 
     if suffix in IMAGE_SUFFIXES:
         return _parse_image(path, filename)
@@ -139,7 +153,12 @@ def _parse_xlsx(path: str) -> ParsedDocument:
     return ParsedDocument(pages=pages, parser="openpyxl", page_count=len(pages))
 
 
-def _parse_pdf(path: str) -> ParsedDocument:
+def _parse_pdf(
+    path: str,
+    *,
+    resume_progress: dict | None = None,
+    on_page_done: OnPageDone | None = None,
+) -> ParsedDocument:
     digital = _parse_pdf_pypdf(path)
     density = _chars_per_page(digital)
     log.info("PDF pypdf densité=%.1f car/page (seuil=%s)", density, PDF_TEXT_MIN_CHARS_PER_PAGE)
@@ -151,7 +170,7 @@ def _parse_pdf(path: str) -> ParsedDocument:
         log.info("PDF : pypdf retenu (Docling absent ou vide)")
         return digital
 
-    paddle = _try_paddle(path)
+    paddle = _try_paddle(path, resume_progress=resume_progress, on_page_done=on_page_done)
     if paddle is not None:
         log.info("PDF scan : PaddleOCR retenu")
         return paddle
@@ -237,32 +256,80 @@ def _pdf_page_image_paths(path: str, dpi: int = 200) -> list[tuple[int, str]]:
     return out
 
 
+def _resume_pages_dict(resume_progress: dict | None) -> dict[int, tuple[str, float | None]]:
+    """Convertit documents.ocr_progress (clés JSON = str) en {page_int: (texte, confiance)}."""
+    if not resume_progress:
+        return {}
+    raw_pages = resume_progress.get("pages") or {}
+    out: dict[int, tuple[str, float | None]] = {}
+    for key, value in raw_pages.items():
+        try:
+            page_num = int(key)
+        except (TypeError, ValueError):
+            continue
+        if isinstance(value, dict):
+            out[page_num] = (value.get("text") or "", value.get("confidence"))
+    return out
+
+
 def _paddle_ocr_pages(
     ocr,
     image_paths: list[tuple[int, str]],
     *,
     parser: str,
     cleanup: bool = True,
+    resume_pages: dict[int, tuple[str, float | None]] | None = None,
+    on_page_done: OnPageDone | None = None,
 ) -> ParsedDocument | None:
     from pathlib import Path
 
+    resume_pages = resume_pages or {}
     pages: list[ParsedPage] = []
     confs: list[float] = []
+    n_resumed = 0
     for page_num, img_path in image_paths:
+        if page_num in resume_pages:
+            # Déjà OCRisée lors d'une tentative précédente (reprise après
+            # timeout de tâche ou crash worker) — on réutilise le résultat
+            # au lieu de refaire l'inférence, potentiellement coûteuse.
+            text, conf = resume_pages[page_num]
+            if cleanup:
+                Path(img_path).unlink(missing_ok=True)
+            if text:
+                pages.append(ParsedPage(page_num, text, None))
+                if conf is not None:
+                    confs.append(conf)
+            n_resumed += 1
+            continue
         try:
             result = ocr.ocr(img_path, cls=True)
         finally:
             if cleanup:
                 Path(img_path).unlink(missing_ok=True)
         lines: list[str] = []
-        for item in result[0] if result else []:
+        page_confs: list[float] = []
+        # PaddleOCR renvoie parfois [None] (pas juste [] ou None) quand aucune
+        # zone de texte n'est détectée sur une page (page de garde, logo, tampon,
+        # page blanche) — sans ce `or []`, `result[0]` vaut None et l'itération
+        # fait planter TOUT le document au lieu d'ignorer cette seule page.
+        page_items = (result[0] if result else None) or []
+        for item in page_items:
             if not item or len(item) < 2:
                 continue
             txt, conf = item[1][0], float(item[1][1])
             lines.append(txt)
-            confs.append(conf)
+            page_confs.append(conf)
+        page_text = "\n".join(lines)
+        page_conf = (sum(page_confs) / len(page_confs)) if page_confs else None
         if lines:
-            pages.append(ParsedPage(page_num, "\n".join(lines), None))
+            pages.append(ParsedPage(page_num, page_text, None))
+            confs.extend(page_confs)
+        # Rappelé pour CHAQUE page (même vide) : une page tentée et vide ne
+        # doit plus jamais être retentée à la prochaine reprise.
+        if on_page_done is not None:
+            on_page_done(page_num, page_text, page_conf)
+    if n_resumed:
+        log.info("PaddleOCR reprise : %s/%s pages réutilisées (déjà OCRisées)", n_resumed, len(image_paths))
     if not pages:
         return None
     avg = sum(confs) / len(confs) if confs else None
@@ -275,7 +342,13 @@ def _paddle_ocr_pages(
     )
 
 
-def _paddle_run(path: str, *, use_gpu: bool) -> ParsedDocument | None:
+def _paddle_run(
+    path: str,
+    *,
+    use_gpu: bool,
+    resume_progress: dict | None = None,
+    on_page_done: OnPageDone | None = None,
+) -> ParsedDocument | None:
     from paddleocr import PaddleOCR
 
     raw = Path(path).read_bytes()[:8]
@@ -286,11 +359,23 @@ def _paddle_run(path: str, *, use_gpu: bool) -> ParsedDocument | None:
         image_paths = _pdf_page_image_paths(path)
         if not image_paths:
             return None
-        return _paddle_ocr_pages(ocr, image_paths, parser=parser, cleanup=True)
+        return _paddle_ocr_pages(
+            ocr,
+            image_paths,
+            parser=parser,
+            cleanup=True,
+            resume_pages=_resume_pages_dict(resume_progress),
+            on_page_done=on_page_done,
+        )
     return _paddle_ocr_pages(ocr, [(1, path)], parser=parser, cleanup=False)
 
 
-def _try_paddle(path: str) -> ParsedDocument | None:
+def _try_paddle(
+    path: str,
+    *,
+    resume_progress: dict | None = None,
+    on_page_done: OnPageDone | None = None,
+) -> ParsedDocument | None:
     try:
         from paddleocr import PaddleOCR  # noqa: F401
     except ImportError:
@@ -302,7 +387,7 @@ def _try_paddle(path: str) -> ParsedDocument | None:
         label = "GPU" if use_gpu else "CPU"
         log.info("PaddleOCR tentative %s (USE_GPU=%s)", label, settings.use_gpu)
         try:
-            parsed = _paddle_run(path, use_gpu=use_gpu)
+            parsed = _paddle_run(path, use_gpu=use_gpu, resume_progress=resume_progress, on_page_done=on_page_done)
             if parsed:
                 log.info("PaddleOCR %s OK — %s pages", label, parsed.page_count)
                 return parsed

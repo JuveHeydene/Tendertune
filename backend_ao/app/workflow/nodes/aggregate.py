@@ -12,9 +12,24 @@ Seule "abstention" doit déclencher une alerte côté UI — jamais "conversatio
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 
 from app.models.pydantic import ResultatExpert, SourceContexte, SousQuestion
+
+log = logging.getLogger("btp.aggregate")
+
+# Budget de caractères pour le contexte agrégé TOTAL — avant cette limite,
+# seul chaque CHUNK était plafonné (12000 caractères), sans borne sur le
+# nombre de chunks cumulés (jusqu'à 50 par sous-question, 4 sous-questions
+# max) ni sur la taille totale. Résultat réel observé : un contexte assez
+# gros pour dépasser même un num_ctx généreux côté Ollama une fois ajoutées
+# les instructions, les exigences liées et le texte existant (mode "ajoute")
+# — le prompt entier se faisait tronquer en silence par Ollama, coupant
+# souvent le schéma JSON attendu en fin de prompt (§ génération non aboutie).
+# ~4 caractères/token en français : 20000 caractères ≈ 5000 tokens, laisse
+# de la marge dans un num_ctx=8192 pour le reste du prompt ET la réponse.
+MAX_CONTEXT_CHARS = 20000
 
 
 @dataclass
@@ -36,6 +51,8 @@ def aggregate(
     experts_par_citation: dict[str, str] = {}
 
     numero = 1
+    total_chars = 0
+    truncated = False
     for sous_question, resultats in sous_questions_resultats:
         if resultats is None:
             # experts=[] (règle R9) — rien à agréger, le générateur s'appuiera
@@ -51,13 +68,30 @@ def aggregate(
             if resultat.source != SourceContexte.retrieval:
                 continue
             for chunk in resultat.chunks:
+                if total_chars >= MAX_CONTEXT_CHARS:
+                    # Ne PAS ajouter ce chunk à citations/experts_par_citation
+                    # non plus — sinon _validate() (generate_section.py)
+                    # accepterait comme "connu" un id que le LLM n'a en
+                    # réalité jamais vu dans son contexte.
+                    truncated = True
+                    continue
                 heading = chunk.heading_path or ""
                 page = chunk.page if chunk.page is not None else "?"
-                parts.append(f"[{numero}] p.{page} {heading} (expert: {resultat.expert.value})\n{chunk.texte[:12000]}")
+                piece = f"[{numero}] p.{page} {heading} (expert: {resultat.expert.value})\n{chunk.texte[:12000]}"
+                parts.append(piece)
+                total_chars += len(piece)
                 citations.append(chunk.chunk_id)
                 experts_par_citation[chunk.chunk_id] = resultat.expert.value
                 numero += 1
             relations.extend(resultat.relations_graphe)
+
+    if truncated:
+        log.warning(
+            "aggregate — contexte plafonné à %d caractères (%d extraits retenus) — "
+            "des extraits moins prioritaires ont été omis pour ne pas dépasser "
+            "la fenêtre de contexte du modèle",
+            MAX_CONTEXT_CHARS, len(parts),
+        )
 
     context_text = "\n\n".join(parts) if parts else (
         "(aucun extrait de recherche documentaire pour cette demande — "

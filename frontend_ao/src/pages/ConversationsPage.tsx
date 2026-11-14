@@ -1,18 +1,31 @@
 import { type FormEvent, useEffect, useRef, useState } from 'react'
-import { useNavigate, useOutletContext, useParams } from 'react-router-dom'
+import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import {
   convApi,
   docsApi,
+  dossierApi,
   downloadDossierExport,
   type Conversation,
+  type Dossier,
   type ExportFormat,
+  type RetrievalTraceEntry,
 } from '../api/client'
 import { MarkdownPreview } from '../components/MarkdownPreview'
+import { TracesModal } from '../components/TracesModal'
 import { useAuth } from '../auth/AuthContext'
 
 type LayoutCtx = { refreshList: () => Promise<void>; listTick: number }
 
 type Msg = NonNullable<Conversation['messages']>[number]
+
+function fileIcon(filename: string): string {
+  const ext = filename.split('.').pop()?.toLowerCase() || ''
+  if (ext === 'pdf') return '📕'
+  if (['doc', 'docx'].includes(ext)) return '📝'
+  if (['xls', 'xlsx'].includes(ext)) return '📊'
+  if (['jpg', 'jpeg', 'png', 'tiff', 'tif', 'webp', 'bmp'].includes(ext)) return '🖼️'
+  return '📄'
+}
 
 function emptyDraftConv(): Conversation {
   return {
@@ -111,11 +124,20 @@ function AssistantBubble({
   message,
   streaming,
   streamDraft,
+  conversationId,
+  dossierId,
 }: {
   message: Msg
   streaming?: boolean
   streamDraft?: string
+  conversationId: string
+  dossierId?: string
 }) {
+  const [tracesOpen, setTracesOpen] = useState(false)
+  const [traces, setTraces] = useState<RetrievalTraceEntry[]>([])
+  const [tracesLoading, setTracesLoading] = useState(false)
+  const [tracesError, setTracesError] = useState<string | null>(null)
+
   if (streaming) {
     return (
       <article className="bubble bubble-assistant bubble-streaming">
@@ -132,6 +154,8 @@ function AssistantBubble({
   const intent = message.meta?.intent as string | undefined
   const md = typeof message.meta?.markdown === 'string' ? message.meta.markdown : null
   const showLead = intent === 'run_section' || intent === 'export' || message.meta?.export
+  const sectionKey = typeof message.meta?.section_key === 'string' ? message.meta.section_key : null
+  const sectionTitle = typeof message.meta?.section_title === 'string' ? message.meta.section_title : null
 
   return (
     <article className="bubble bubble-assistant">
@@ -141,6 +165,41 @@ function AssistantBubble({
       ) : (
         <p>{message.content}</p>
       )}
+      {intent === 'run_section' && dossierId ? (
+        <Link
+          to={`/app/dossiers/${dossierId}?tab=sections${sectionKey ? `&section=${sectionKey}` : ''}`}
+          className="bubble-section-link"
+        >
+          → Voir{sectionTitle ? ` « ${sectionTitle} »` : ' la section'} dans le Plan du dossier
+        </Link>
+      ) : null}
+      <button
+        type="button"
+        className="btn-link bubble-why"
+        onClick={async () => {
+          setTracesOpen(true)
+          setTracesLoading(true)
+          setTracesError(null)
+          try {
+            setTraces(await convApi.messageTraces(conversationId, message.id))
+          } catch (e) {
+            setTracesError(e instanceof Error ? e.message : String(e))
+          } finally {
+            setTracesLoading(false)
+          }
+        }}
+      >
+        Pourquoi cette réponse ?
+      </button>
+      {tracesOpen ? (
+        <TracesModal
+          title="cette réponse"
+          traces={traces}
+          loading={tracesLoading}
+          error={tracesError}
+          onClose={() => setTracesOpen(false)}
+        />
+      ) : null}
     </article>
   )
 }
@@ -167,6 +226,24 @@ export function ConversationThread() {
   const [pendingFile, setPendingFile] = useState<File | null>(null)
   const [pendingRole, setPendingRole] = useState<'annexe' | 'patrimoine'>('annexe')
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [dossierOptions, setDossierOptions] = useState<Dossier[]>([])
+  const [draftDossierId, setDraftDossierId] = useState<string>('')
+  const [dossierStatus, setDossierStatus] = useState<Dossier | null>(null)
+
+  useEffect(() => {
+    dossierApi.list().then(setDossierOptions).catch(() => undefined)
+  }, [])
+
+  useEffect(() => {
+    if (!conv?.dossier_id) {
+      setDossierStatus(null)
+      return
+    }
+    dossierApi
+      .get(conv.dossier_id)
+      .then(setDossierStatus)
+      .catch(() => setDossierStatus(null))
+  }, [conv?.dossier_id])
 
   function applyPreview(c: Conversation, keepPreviousIfEmpty = false) {
     const next = buildDocumentPreview(c)
@@ -192,6 +269,7 @@ export function ConversationThread() {
     setConv(emptyDraftConv())
     setDocPreview('')
     setStreamDraft('')
+    setDraftDossierId('')
     composerRef.current?.focus()
   }, [id, isDraft])
 
@@ -256,11 +334,11 @@ export function ConversationThread() {
     try {
       if (isDraft || !convId) {
         pendingSendRef.current = true
-        const created = await convApi.create()
+        const created = await convApi.create(undefined, draftDossierId || null)
         convId = created.id
         setConv((prev) =>
           prev
-            ? { ...prev, id: created.id, can_export: created.can_export ?? false }
+            ? { ...prev, id: created.id, dossier_id: created.dossier_id, can_export: created.can_export ?? false }
             : created,
         )
         navigate(`/app/conversations/${created.id}`, { replace: true })
@@ -311,7 +389,7 @@ export function ConversationThread() {
     // conversation est déjà liée à un dossier (sinon rien à scoper) : dans
     // ce cas, on demande explicitement plutôt que de figer le rôle en
     // silence (c'était le bug V1 : doc_role toujours "patrimoine").
-    if (conv?.dossier_id) {
+    if (conv?.dossier_id || (isDraft && draftDossierId)) {
       setPendingRole('annexe')
       setPendingFile(file)
       return
@@ -330,7 +408,7 @@ export function ConversationThread() {
       if (isDraft || !convId || convId === 'new') {
         pendingSendRef.current = true
         setBusy(true)
-        const created = await convApi.create()
+        const created = await convApi.create(undefined, draftDossierId || null)
         convId = created.id
         navigate(`/app/conversations/${created.id}`, { replace: true })
       }
@@ -414,10 +492,64 @@ export function ConversationThread() {
   return (
     <div className="conv-workspace">
       <section className="conv-chat">
-        <header className="conv-chat-head">
-          <h1>{conv.title}</h1>
-          {error ? <p className="form-error conv-head-error">{error}</p> : null}
-        </header>
+        <div className="conv-chat-top">
+          <header className="conv-chat-head">
+            <h1>{conv.title}</h1>
+            {error ? <p className="form-error conv-head-error">{error}</p> : null}
+          </header>
+
+          {isDraft && messages.length === 0 ? (
+            <div className="conv-dossier-picker">
+              <label htmlFor="conv-dossier-select">Cette conversation concerne :</label>
+              <select
+                id="conv-dossier-select"
+                className="select-dark"
+                value={draftDossierId}
+                onChange={(e) => setDraftDossierId(e.target.value)}
+              >
+                <option value="">— Recherche libre (patrimoine, sans dossier) —</option>
+                {dossierOptions.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.project_name || 'Sans nom'}
+                    {d.client_name ? ` — ${d.client_name}` : ''}
+                  </option>
+                ))}
+              </select>
+              {dossierOptions.length === 0 ? (
+                <p className="muted">
+                  Aucun dossier existant — <Link to="/app/dossiers">créez-en un</Link> pour rédiger un
+                  mémoire, ou continuez en recherche libre sur le patrimoine.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {dossierStatus ? (
+            <div className="conv-dossier-status">
+              <Link to={`/app/dossiers/${dossierStatus.id}`} className="pill pill-info">
+                Dossier : {dossierStatus.project_name || 'Sans nom'}
+              </Link>
+              <Link
+                to={`/app/dossiers/${dossierStatus.id}?tab=exigences`}
+                className={dossierStatus.exigences_eliminatoires_non_couvertes > 0 ? 'pill pill-danger' : 'pill pill-muted'}
+              >
+                Exigences {dossierStatus.exigences_couvertes}/{dossierStatus.exigences_total}
+                {dossierStatus.exigences_eliminatoires_non_couvertes > 0 ? ' ⚠️' : ''}
+              </Link>
+              <Link to={`/app/dossiers/${dossierStatus.id}?tab=sections`} className="pill pill-muted">
+                Sections {dossierStatus.sections_approuvees}/{dossierStatus.sections_total}
+              </Link>
+              {!dossierStatus.has_dao ? (
+                <Link to={`/app/dossiers/${dossierStatus.id}?tab=documents`} className="pill pill-warn">
+                  DAO non chargé
+                </Link>
+              ) : null}
+              <Link to={`/app/dossiers/${dossierStatus.id}`} className="link-btn">
+                Voir le dossier →
+              </Link>
+            </div>
+          ) : null}
+        </div>
 
         <div className="conv-chat-scroll">
           <div className="messages">
@@ -472,12 +604,36 @@ export function ConversationThread() {
             {messages.map((m, i) => {
               if (m.role === 'user') {
                 const isUpload = m.meta?.upload
+                if (isUpload) {
+                  const filename = typeof m.meta?.filename === 'string' ? m.meta.filename : 'Document'
+                  const docRole = typeof m.meta?.doc_role === 'string' ? m.meta.doc_role : null
+                  const docStatus = typeof m.meta?.doc_status === 'string' ? m.meta.doc_status : null
+                  const duplicate = m.meta?.duplicate === true
+                  return (
+                    <article key={m.id} className="bubble bubble-user bubble-upload">
+                      <div className="upload-card">
+                        <span className="upload-card-icon" aria-hidden="true">
+                          {fileIcon(filename)}
+                        </span>
+                        <div className="upload-card-body">
+                          <strong className="upload-card-name">{filename}</strong>
+                          <span className="upload-card-meta">
+                            {docRole === 'patrimoine' ? 'Ajouté au patrimoine' : 'Aide ponctuelle (annexe)'}
+                            {duplicate ? ' · déjà présent' : ''}
+                            {docStatus ? (
+                              <span className={`upload-card-status upload-card-status--${docStatus}`}>
+                                {' · '}
+                                {docStatus === 'ready' ? 'prêt' : docStatus === 'failed' ? 'échec' : docStatus}
+                              </span>
+                            ) : null}
+                          </span>
+                        </div>
+                      </div>
+                    </article>
+                  )
+                }
                 return (
-                  <article
-                    key={m.id}
-                    className={`bubble bubble-user${isUpload ? ' bubble-upload' : ''}`}
-                  >
-                    {isUpload ? <p className="bubble-upload-tag">📎 Document</p> : null}
+                  <article key={m.id} className="bubble bubble-user">
                     <p>{m.content}</p>
                   </article>
                 )
@@ -488,6 +644,8 @@ export function ConversationThread() {
                   message={m}
                   streaming={showStreamBubble && i === messages.length - 1}
                   streamDraft={streamDraft}
+                  conversationId={id || ''}
+                  dossierId={dossierStatus?.id}
                 />
               )
             })}

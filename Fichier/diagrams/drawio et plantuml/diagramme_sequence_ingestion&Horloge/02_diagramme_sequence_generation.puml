@@ -1,0 +1,694 @@
+@startuml
+' ==========================================================================
+' DIAGRAMME DE SEQUENCE - PROCESSUS DE GENERATION (vue reelle et exhaustive)
+' Genere a partir du code source de backend_ao (V2 - pipeline agentique).
+' Sources tracees : app/api/conversations.py, app/api/dossiers.py,
+' app/services/chat_pipeline.py, app/workflow/agentic_pipeline.py,
+' app/workflow/nodes/{rewrite,superviseur,generate_section}.py,
+' app/rag/{experts,grading,graph_expert,fusion,rerank,hybrid_retriever}.py,
+' app/services/{ollama_llm,dossier_workflow}.py, app/graph/entity_match.py
+'
+' NOTE IMPORTANTE : il existe aussi un flux V1 historique plus simple
+' (app/workflow/graph.py, LangGraph, route par mots-cles, 1 seul appel LLM,
+' sans CRAG) utilise par l'endpoint non-streamant. Il est resume en fin de
+' diagramme (bloc "FLUX HISTORIQUE V1") car il reste atteignable dans le
+' code mais n'est plus le chemin principal utilise par l'interface.
+' ==========================================================================
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 220
+skinparam wrapWidth 260
+autonumber
+
+skinparam ArrowColor #333333
+skinparam sequenceLifeLineBorderColor #999999
+skinparam noteBackgroundColor #FFFFE0
+skinparam noteBorderColor #DAA520
+skinparam sequenceReferenceBackgroundColor #F0F8FF
+skinparam sequenceReferenceBorderColor #4682B4
+
+actor "Redacteur\n(utilisateur)" as User #FFD700
+participant "Interface Web\n(React, SSE)" as UI #87CEEB
+participant "API FastAPI\napi/conversations.py\napi/dossiers.py" as API #ADD8E6
+participant "Orchestrateur\nagentic_pipeline.py" as Orch #FFB6C1
+participant "LLM Ollama\n(granite3.3:2b)" as LLM #90EE90
+participant "Experts RAG\n(juridique/technique/\nfinancier/patrimoine)" as Expert #98FB98
+participant "Expert Graphe\ngraph_expert.py" as GraphExpert #C8A2C8
+participant "Reranker\n(lexical + RRF,\nPAS un cross-encoder)" as Rerank #FFDAB9
+database "Qdrant\n(dense)" as Vec #87CEFA
+database "Postgres\n(FTS + tables)" as DB #F08080
+database "Neo4j\n(graphe)" as GraphDB #D3D3A0
+participant "Generateur de section\ngenerate_section.py" as GenSection #FFB6C1
+database "MinIO\n(exports)" as MinIO #E0D0F0
+
+title Diagramme de sequence - Generation (chat agentique + dossier + revue humaine)
+
+== ETAPE 0 : Reception du message (endpoint streaming SSE) ==
+
+User -> UI : Pose une question / demande\nune section / demande un export
+activate UI #87CEEB
+UI -> API : POST /conversations/{id}/messages/stream
+activate API #ADD8E6
+API -> API : _load_conv() : verifie tenant + \n(role admin OU proprietaire de la conversation)
+alt conversation introuvable / mauvais tenant
+    API --> UI : 404
+else acces refuse (ni admin, ni proprietaire)
+    API --> UI : 403
+else acces autorise
+    API -> DB : INSERT Message (role="user", texte)\ncommit() (pas un simple flush)
+    activate DB #F08080
+    note right of DB #FFFFE0
+      Commit necessaire ici : les experts, plus loin,
+      ecrivent des RetrievalTrace depuis des sessions
+      DB separees, avec une cle etrangere vers ce
+      message -> violerait la contrainte FK sinon.
+    end note
+    DB --> API : OK
+    deactivate DB
+    API --> UI : SSE event "user"
+    API -> Orch : run_agentic_retrieval(texte, historique,\ntenant_id, dossier_id, message_id)
+    activate Orch #FFB6C1
+end
+
+== ETAPE 1 : Reecriture de la question (resolution des references) ==
+
+Orch -> LLM : ollama_generate_json(prompt de reecriture,\ntimeout=60s, num_ctx=4096)
+activate LLM #90EE90
+note right of LLM #FFFFE0
+  Objectif : resoudre les references implicites
+  ("ca", "le dernier", etc.) a l'aide de l'historique.
+  num_ctx explicite : sans lui Ollama retombe sur son
+  defaut (2048), qui peut tronquer un prompt + historique
+  long en silence (aucune erreur visible).
+end note
+alt question vide
+    Orch -> Orch : retourne la question telle quelle\n(aucun appel LLM)
+else appel LLM en echec (injoignable / JSON invalide)
+    LLM --> Orch : exception
+    Orch -> Orch : fallback deterministe :\nretourne la question BRUTE inchangee
+else succes
+    LLM --> Orch : question reformulee (query_clean)
+end
+deactivate LLM
+
+== ETAPE 2 : Superviseur - routage et decomposition ==
+
+alt query_clean vide
+    Orch -> Orch : intent = "smalltalk" directement\n(aucun appel LLM)
+else query_clean non vide
+    Orch -> LLM : ollama_generate_json(prompt de supervision,\ntimeout=90s, num_ctx=4096)
+    activate LLM #90EE90
+    note right of LLM #FFFFE0
+      Schema JSON strict attendu :
+      intent in {smalltalk, export, clarification_needed,
+      hybrid_rag, run_section}
+      + sous_questions[ {texte, experts[], complexite} ]
+      experts in {juridique, technique, financier,
+      graphe, patrimoine} ; complexite in {simple, complexe}
+    end note
+    alt reponse JSON invalide (ValidationError) OU appel en echec
+        LLM --> Orch : exception
+        Orch -> Orch : _fallback() : reutilise le routage\npar mots-cles historique (V1) pour choisir\nl'intent, 1 sous-question generique\n(expert=patrimoine, complexite=simple)
+    else reponse JSON valide
+        LLM --> Orch : SuperviseurOutput brut
+    end
+    deactivate LLM
+
+    Orch -> Orch : garde-fous deterministes\n(ne jamais faire confiance aveuglement au LLM) :
+    note right of Orch #FFFFE0
+      1. plus de 4 sous-questions -> tronque a 4
+      2. intent="clarification_needed" MAIS des
+         sous-questions presentes -> requalifie en
+         "hybrid_rag"
+      3. intent in {smalltalk, export,
+         clarification_needed} -> force sous_questions=[]
+         sinon force message_clarification=None
+      4. clarification_needed sans message -> message
+         par defaut injecte
+      5. intent in {hybrid_rag, run_section} ET aucune
+         sous-question -> injecte une sous-question de
+         secours (patrimoine, simple)
+      6. is_compound recalcule = len(sous_questions) > 1
+         (la valeur du LLM est ignoree)
+    end note
+end
+
+alt intent in {smalltalk, export, clarification_needed}
+    Orch -> Orch : retour immediat, AUCUNE recherche\ndocumentaire declenchee (aggregated=None)
+else intent in {hybrid_rag, run_section}
+    note right of Orch #F0F8FF
+      Poursuite vers la recherche documentaire
+      (etapes 3 et 4 ci-dessous)
+    end note
+end
+
+== ETAPE 3 : Recherche documentaire - dispatch parallele des sous-questions ==
+
+par pour chaque sous-question (asyncio.gather, en parallele)
+    alt sous_question.experts est vide\n(reponse deja dans l'historique, regle R9)
+        Orch -> Orch : resultat = None ("conversation",\nni recherche ni abstention)
+    else au moins un expert nomme
+        par pour chaque expert nomme (en parallele)
+            alt expert == "graphe"
+                Orch -> GraphExpert : run_graph_expert(question, tenant_id)
+                activate GraphExpert #C8A2C8
+                GraphExpert -> LLM : extraction JSON des entites\nde la question (num_ctx=2048)
+                activate LLM #90EE90
+                alt aucune entite extraite
+                    LLM --> GraphExpert : []
+                    GraphExpert -> GraphExpert : abstention\n("aucune entite identifiable")
+                else entites extraites
+                    LLM --> GraphExpert : entites (type, nom)
+                    deactivate LLM
+                    GraphExpert -> GraphExpert : resolution fuzzy contre\nl'index Neo4j du tenant\n(exact/levenshtein/token_set/embedding)
+                    alt aucune cle resolue
+                        GraphExpert -> GraphExpert : abstention
+                    else >= 2 entites resolues
+                        GraphExpert -> GraphDB : requete TWO_ANCHORS\n(chemin entre les 2 premieres entites)
+                        activate GraphDB #D3D3A0
+                        alt resultat non vide
+                            GraphDB --> GraphExpert : relations trouvees
+                        else vide
+                            GraphDB --> GraphExpert : rien
+                            GraphExpert -> GraphExpert : repli -> BOUNDED_TWO_HOP\npuis ONE_HOP (par entite)
+                        end
+                        deactivate GraphDB
+                    else 1 seule entite resolue
+                        GraphExpert -> GraphDB : BOUNDED_TWO_HOP\n(filtre CONFORMITE_REL_TYPES)\npuis ONE_HOP si toujours vide
+                        activate GraphDB #D3D3A0
+                        GraphDB --> GraphExpert : relations (ou rien)
+                        deactivate GraphDB
+                    end
+                    alt requete Neo4j leve une exception
+                        GraphExpert -> GraphExpert : abstention (message = exception)
+                    else relations trouvees sans source_chunk_id
+                        GraphExpert -> GraphExpert : source="retrieval" quand meme,\nfaits de graphe sans citation textuelle
+                    else relations trouvees avec chunks
+                        GraphExpert -> GraphExpert : source="retrieval", chunks + relations
+                    end
+                end
+                GraphExpert --> Orch : ResultatExpert
+                deactivate GraphExpert
+            else expert in {juridique, technique, financier, patrimoine}
+                Orch -> Expert : run_expert(expert, question, filtres)
+                activate Expert #98FB98
+                note right of Expert #FFFFE0
+                  Filtres par expert (EXPERT_SCOPES) :
+                  juridique -> section_types=[rc,ccap]
+                  technique -> section_types=[cctp]
+                  financier -> section_types=[dpgf,bpu]
+                  patrimoine -> doc_roles=[patrimoine,dao_archive]
+                end note
+
+                alt complexite == "simple"
+                    Expert -> Vec : recherche dense (top_k=8)
+                    activate Vec #87CEFA
+                    Vec --> Expert : candidats
+                    deactivate Vec
+                    Expert -> DB : recherche sparse FTS (top_k=8)
+                    activate DB #F08080
+                    DB --> Expert : candidats
+                    deactivate DB
+                    Expert -> Expert : fusion RRF (k=60)
+                    Expert -> Rerank : rerank(query, fusion, top_n=8)
+                    activate Rerank #FFDAB9
+                    Rerank --> Expert : top-8 final
+                    deactivate Rerank
+                    Expert -> DB : ecrit RetrievalTrace (grade=None,\n"non gradé" : raccourci adaptatif, aucune\nboucle CRAG)
+                    activate DB #F08080
+                    DB --> Expert : OK
+                    deactivate DB
+                    alt top-8 non vide
+                        Expert -> Expert : source = "retrieval"
+                    else vide
+                        Expert -> Expert : source = "abstention"
+                    end
+
+                else complexite == "complexe" (boucle CRAG, max 3 tentatives)
+                    loop iteration = 1..3
+                        Expert -> Vec : recherche dense (top_k=50,\nfiltres section_type/doc_role actifs)
+                        activate Vec #87CEFA
+                        Vec --> Expert : candidats
+                        deactivate Vec
+                        Expert -> DB : recherche sparse FTS (top_k=50)
+                        activate DB #F08080
+                        DB --> Expert : candidats
+                        deactivate DB
+                        Expert -> Expert : fusion RRF + rerank(top_n=8)
+
+                        Expert -> Expert : grade_context(question, candidats)
+                        alt aucun chunk
+                            Expert -> Expert : grade = "incorrect" (seuil)
+                        else score max >= 0.7 (SEUIL_CORRECT)
+                            Expert -> Expert : grade = "correct" (seuil)
+                        else score max < 0.3 (SEUIL_INCORRECT)
+                            Expert -> Expert : grade = "incorrect" (seuil)
+                        else zone grise [0.3 ; 0.7)
+                            Expert -> LLM : appel "juge" (timeout=60s, num_ctx=4096) :\nclasse correct/ambigu/incorrect sur le top-5\n(5 chunks max, 1500 caracteres chacun)
+                            activate LLM #90EE90
+                            alt exception
+                                LLM --> Expert : grade = "ambigu" (fallback)
+                            else succes
+                                LLM --> Expert : grade juge par le LLM
+                            end
+                            deactivate LLM
+                        end
+
+                        Expert -> DB : ecrit RetrievalTrace\n(grade, methode, tentative=iteration)
+                        activate DB #F08080
+                        DB --> Expert : OK
+                        deactivate DB
+
+                        alt grade == "correct"
+                            Expert -> Expert : sortie immediate de la boucle,\nsource="retrieval"
+                        else derniere iteration (3) sans "correct"
+                            Expert -> Expert : sortie de la boucle -> abstention
+                        else grade == "ambigu"
+                            Expert -> Expert : ELARGIT le perimetre :\nretire d'abord le filtre section_type,\nsinon retire le filtre doc_role\n(1 filtre par iteration, PAS de reformulation)
+                        else grade == "incorrect"
+                            Expert -> LLM : reformulate(question)\n(1 appel LLM, timeout=45s, num_ctx=2048,\nvariante multi-requete : synonymes/angle different)
+                            activate LLM #90EE90
+                            alt echec
+                                LLM --> Expert : question inchangee
+                            else succes
+                                LLM --> Expert : nouvelle formulation
+                            end
+                            deactivate LLM
+                        end
+                    end
+                    alt aucune iteration n'a atteint "correct"
+                        Expert -> DB : ecrit RetrievalTrace finale\n(abstention=true)
+                        activate DB #F08080
+                        DB --> Expert : OK
+                        deactivate DB
+                        Expert -> Expert : source="abstention",\nraison="Aucun resultat juge suffisant\napres 3 tentatives."
+                    end
+                end
+                Expert --> Orch : ResultatExpert (chunks, source)
+                deactivate Expert
+            end
+        end
+    end
+end
+
+== ETAPE 4 : Agregation du contexte ==
+
+Orch -> Orch : aggregate(sous_questions, resultats)
+note right of Orch #FFFFE0
+  <b>MAX_CONTEXT_CHARS = 20000</b> (plafond du contexte TOTAL
+  agrege) + cap de 12000 caracteres PAR chunk. Sans ce
+  plafond global, un contexte volumineux (jusqu'a 200 chunks
+  cumules sur 4 sous-questions x 50) pouvait depasser
+  silencieusement le num_ctx d'Ollama et tronquer le schema
+  JSON attendu en fin de prompt -- cause racine identifiee
+  d'echecs de generation.
+end note
+loop pour chaque paire (sous_question, resultats)
+    alt resultats == None ("conversation")
+        Orch -> Orch : ignore cette sous-question
+    else total_chars >= MAX_CONTEXT_CHARS deja atteint
+        Orch -> Orch : chunk EXCLU du texte ET de citations[]/\nexperts_par_citation{} -- jamais citable un\nextrait que le LLM n'a en realite jamais vu
+    else pour chaque ResultatExpert de la sous-question
+        alt source == "abstention"
+            Orch -> Orch : ajoute un texte lisible\ndans abstentions[]
+        else source == "retrieval"
+            Orch -> Orch : ajoute bloc de contexte numerote\n"[n] p.{page} {heading} (expert: {nom})"\n+ citations[] + experts_par_citation{}\n+ relations_graphe[] eventuelles
+        end
+    end
+end
+alt aucun contexte collecte du tout
+    Orch -> Orch : context_text = texte de repli\n"(aucun extrait de recherche documentaire...)"
+end
+Orch --> API : AggregatedContext (context_text,\ncitations, abstentions, experts_par_citation)
+deactivate Orch
+
+== ETAPE 5 : Branchement final selon l'intention ==
+
+alt intent == "smalltalk"
+    API --> UI : SSE token(s) + reponse toute faite
+    API -> DB : persiste Message assistant, commit
+else intent == "clarification_needed"
+    API --> UI : SSE token(s) = message_clarification
+    API -> DB : persiste Message assistant, commit
+
+else intent == "export"
+    API -> API : detecte le format demande dans le texte\n(pdf/markdown/md/txt/docx), defaut = "docx"
+    alt role sans droit d'ecriture (can_write == false)
+        API --> UI : SSE "error" (403 implicite)
+    else conv.dossier_id absent
+        API -> API : require_dossier() leve DossierRequisError
+        API --> UI : SSE "error" ("aucun dossier associe")
+    else autorise et dossier present
+        API -> API : construit "notes" a partir des\n12 derniers messages
+        API -> DB : export_document(...) -> voir ETAPE 9
+        API --> UI : SSE "export_ready" puis "done"
+    end
+
+else intent == "run_section" ET can_write(user) == false
+    API -> DB : persiste message "refuse" (role assistant)
+    API --> UI : SSE "error"
+
+else intent == "run_section" ET conv.dossier_id absent
+    note right of API #FFFFE0
+      Garde precoce explicite : evite de lancer une
+      recherche + generation couteuses avant d'echouer
+      de toute facon a la persistance.
+    end note
+    API -> DB : persiste message de guidage
+    API --> UI : SSE "error"
+
+else intent == "hybrid_rag"  (streaming reel, token par token)
+    API -> API : construit le prompt (historique formate\n+ context_text + regle "cite [1],[2]...\nsinon dis que les extraits ne suffisent pas")
+    API -> LLM : ollama_generate_stream(prompt, num_ctx=8192)
+    note right of LLM #FFFFE0
+      num_ctx=8192 : ce prompt embarque le contexte agrege
+      complet (deja plafonne a 20000 caracteres, ETAPE 4) --
+      meme besoin que generate_section (ETAPE 6).
+    end note
+    activate LLM #90EE90
+    loop pour chaque token recu
+        alt erreur en cours de flux
+            LLM --> API : exception
+            API --> UI : SSE "error" (aucun message persiste)
+        else token recu
+            LLM --> API : token
+            API --> UI : SSE "token"
+        end
+    end
+    deactivate LLM
+    API --> UI : SSE "section_end", "preview"
+    API -> DB : persiste Message assistant\n(meta.abstentions, meta.experts_par_citation)
+    activate DB #F08080
+    DB --> API : OK
+    deactivate DB
+    API --> UI : SSE "done"
+
+else intent == "run_section"  (JSON contraint, pas de streaming brut)
+    note right of API #FFE4E1
+      <b>generate_all et pick_section utilisent le texte BRUT
+      original (text), PAS query_clean</b> (la question reecrite
+      a l'ETAPE 1) : query_clean transforme volontairement un
+      imperatif ("Redige...") en phrase de recherche neutre, ce
+      qui efface le verbe d'action dont ces detections ont
+      besoin. Bug reel observe et corrige : "Redige la
+      presentation..." reecrit sans "redige" faisait tomber
+      la detection vers la section generique par defaut.
+    end note
+    API -> API : generate_all = phrase du type\n"tout le memoire" / "toutes les sections" ?\n(recherche sur le texte BRUT)
+    alt generate_all == true
+        API -> API : sections_a_traiter = DEFAULT_OUTLINE\n(presentation, moyens_humains, references,\nmethodologie, planning)
+    else une seule section demandee
+        API -> API : pick_section(texte BRUT) -> 1 section
+    end
+
+    loop pour chaque section a traiter
+        alt premiere section ET generate_all == false
+            API -> API : reutilise le contexte deja agrege\nde l'ETAPE 4 (pas de nouvelle recherche)
+        else section suivante OU generate_all == true
+            note right of API #FFFFE0
+              Chaque section merite sa propre recherche :
+              on ne reutilise jamais le contexte d'une
+              autre section (comportement volontaire).
+            end note
+            API -> Orch : run_agentic_retrieval(\n"Redige la section : {titre}", ...)
+            activate Orch #FFB6C1
+            Orch --> API : nouveau contexte agrege\n(re-execute ETAPES 1 a 4)
+            deactivate Orch
+        end
+
+        API -> GenSection : generate_section(section_key, titre,\narchetype, contexte_agrege, historique)
+        activate GenSection #FFB6C1
+        ref over GenSection, LLM, DB : voir ETAPE 6 (generation contrainte + validation)
+        GenSection --> API : SectionGeneree (validee ou repli)
+        deactivate GenSection
+
+        API -> API : rendu Markdown, puis
+        note right of API #FFFFE0
+          Le decoupage en "tokens" ici est artificiel
+          (paquets de ~120 caracteres) : le contrat JSON
+          complet doit deja etre valide avant tout envoi,
+          contrairement a hybrid_rag qui streame reellement.
+        end note
+        API --> UI : SSE "token" (paquets) pour la section
+        API -> DB : save_generation(...)\nOutlineItem.status="generated",\nDossier.status="generating", version+1
+        activate DB #F08080
+        DB --> API : OK
+        deactivate DB
+    end
+    API -> DB : persiste Message assistant recapitulatif
+    activate DB #F08080
+    DB --> API : OK
+    deactivate DB
+    API --> UI : SSE "done"
+end
+deactivate API
+UI --> User : Affiche la reponse / la section generee
+deactivate UI
+
+== ETAPE 6 : Generation contrainte JSON d'une section + validation ==
+
+activate GenSection #FFB6C1
+GenSection -> GenSection : choisit le guide d'archetype :\ninstitutionnelle / factuelle / narrative / conformite\n(defaut = factuelle)
+
+loop tentative = 1..2 (MAX_ESSAIS)
+    GenSection -> LLM : ollama_generate_json(prompt, timeout=180s,\nnum_ctx=8192,\nschema=SectionGeneree.model_json_schema())
+    activate LLM #90EE90
+    note right of LLM #FFFFE0
+      <b>SCHEMA JSON CONTRAINT</b> (pas "format":"json" simple) :
+      le decodage token par token d'Ollama est force a
+      respecter EXACTEMENT ce schema -- le modele ne PEUT
+      PAS produire une structure hors schema. Correctif majeur :
+      avec "format":"json" seul, ce petit modele derivait
+      regulierement vers des champs inventes sans rapport
+      (ex: "meilleur_expert") -- mesure : 8/8 succes apres ce
+      correctif, contre ~2-4/8 avant (50-75% d'echec).
+    end note
+    alt exception (injoignable / timeout)
+        LLM --> GenSection : exception
+        GenSection -> GenSection : memorise l'erreur,\ncontinue a la tentative suivante\n(prompt inchange)
+    else reponse recue
+        LLM --> GenSection : JSON brut\n(citations = NUMEROS "1","2"... jamais\nl'identifiant reel du chunk)
+        deactivate LLM
+
+        GenSection -> GenSection : _translate_citation_numbers() :\ntraduit chaque numero cite (et document_id\nd'un bloc image) vers le VRAI chunk_id, via\naggregated.citations[numero-1]
+        note right of GenSection #FFFFE0
+          Necessaire car le LLM ne voit JAMAIS l'identifiant
+          reel d'un extrait dans son prompt -- seulement le
+          numero affiche [n]. Lui demander de citer un
+          chunk_id serait structurellement impossible.
+        end note
+
+        alt JSON ne respecte pas le schema Pydantic\nSectionGeneree
+            GenSection -> GenSection : ajoute au prompt :\n"ERREUR precedente a corriger : {erreur}\nReponds a nouveau en JSON valide."
+            GenSection -> GenSection : continue a la tentative suivante
+        else schema valide -> validation deterministe (_validate),\napres traduction des citations :
+            alt une citation n'existe pas dans le contexte agrege
+                GenSection -> GenSection : erreur "citation inexistante"
+            else un bloc "sous_titre" a heading_level > 3
+                GenSection -> GenSection : erreur (niveau de titre interdit)
+            else un bloc commence par "# " (H1 litteral)
+                GenSection -> GenSection : erreur "H1 litteral interdit"
+            else bloc "image" avec document_id inconnu du contexte
+                GenSection -> GenSection : erreur "document_id inconnu"
+            else aucune erreur
+                GenSection -> GenSection : SUCCES -> sort de la boucle
+            end
+            alt des erreurs de validation ont ete trouvees
+                GenSection -> GenSection : ajoute "ERREURS a corriger : ..."\nau prompt, continue a la tentative suivante
+            end
+        end
+    end
+end
+
+alt une tentative a reussi (schema + validation OK)
+    GenSection -> GenSection : retourne SectionGeneree validee
+else 2 tentatives epuisees sans succes
+    GenSection -> GenSection : repli : bloc unique\n"[Generation non aboutie - voir logs]"\n+ abstention "Echec technique de generation."
+    note right of GenSection #FFE4E1
+      Echec "doux" : aucune exception ne remonte
+      a l'appelant, la section est quand meme rendue
+      (avec un contenu degrade et explicite).
+    end note
+end
+deactivate GenSection
+
+== ETAPE 7 : Generation de section a la demande (hors conversation) ==
+
+User -> UI : Depuis la fiche dossier, clique\n"Generer cette section"
+activate UI #87CEEB
+UI -> API : POST /dossiers/{id}/sections/{key}/generate
+activate API #ADD8E6
+API -> DB : charge OutlineItem (404 si absent)
+activate DB #F08080
+DB --> API : OutlineItem
+deactivate DB
+API -> Orch : run_agentic_retrieval(\n"Redige la section : {titre}", historique=[],\ntenant_id, dossier_id)
+activate Orch #FFB6C1
+note right of Orch #FFFFE0
+  historique TOUJOURS vide ici : generation
+  purement dossier, decouplee de tout chat.
+end note
+Orch --> API : contexte agrege (ou repli si aggregated=None,\ncas theorique ou le superviseur ne\nrenverrait ni hybrid_rag ni run_section)
+deactivate Orch
+API -> GenSection : generate_section(...)
+activate GenSection #FFB6C1
+ref over GenSection : voir ETAPE 6
+GenSection --> API : SectionGeneree
+deactivate GenSection
+API -> DB : save_generation() -> nouvelle version,\nOutlineItem.status="generated",\nDossier.status="generating"
+activate DB #F08080
+DB --> API : OK
+deactivate DB
+API --> UI : SectionDetailOut (markdown, citations, abstentions)
+deactivate API
+UI --> User : Affiche la section generee pour relecture
+deactivate UI
+
+== ETAPE 8 : Revue humaine (HITL) ==
+
+User -> UI : Approuve / modifie / demande\nune regeneration
+activate UI #87CEEB
+UI -> API : POST /dossiers/{id}/sections/{key}/review\n(action, texte?, commentaire?)
+activate API #ADD8E6
+API -> DB : charge OutlineItem + derniere Generation
+activate DB #F08080
+alt aucune generation existante pour cette section
+    DB --> API : rien
+    API --> UI : 400 "Aucune generation a revoir"
+else generation existante
+    DB --> API : OK
+    deactivate DB
+
+    alt action == "approuver"
+        API -> LLM : genere un resume court (summary_short)\npour reutilisation future dans d'autres sections
+        activate LLM #90EE90
+        alt echec de l'appel LLM
+            LLM --> API : exception
+            API -> API : log warning, summary_short\nnon renseigne (NON bloquant)
+        else succes
+            LLM --> API : summary_short
+        end
+        deactivate LLM
+        API -> DB : OutlineItem.status = "approved"\nINSERT Review(action="approve")\n(liee a la generation EXISTANTE, pas de\nnouvelle version)
+        activate DB #F08080
+        DB --> API : OK
+        deactivate DB
+
+    else action == "modifier"
+        API -> DB : save_generation(texte modifie)\n-> NOUVELLE version de Generation\n(reutilise citations/modele precedents)
+        activate DB #F08080
+        DB --> API : OK
+        API -> DB : OutlineItem.status = "approved"\nINSERT Review(action="edit",\nliee a la NOUVELLE generation)
+        DB --> API : OK
+        deactivate DB
+
+    else action == "regenerer"
+        API -> DB : OutlineItem.status = "rejected"\n(etat intermediaire)\nINSERT Review(action="regen",\nliee a l'ANCIENNE generation)
+        activate DB #F08080
+        DB --> API : OK
+        deactivate DB
+        API -> Orch : run_agentic_retrieval(\n"Redige la section : {titre}", historique=[])
+        activate Orch #FFB6C1
+        Orch --> API : nouveau contexte agrege
+        deactivate Orch
+        API -> GenSection : generate_section(..., custom_instruction=\ncommentaire de l'utilisateur)
+        activate GenSection #FFB6C1
+        note right of GenSection #FFFFE0
+          Le commentaire humain est injecte dans le
+          prompt : "Consigne complementaire de
+          l'utilisateur : {commentaire}"
+        end note
+        ref over GenSection : voir ETAPE 6
+        GenSection --> API : nouvelle SectionGeneree
+        deactivate GenSection
+        API -> DB : save_generation() -> NOUVELLE version\nOutlineItem.status = "generated"
+        activate DB #F08080
+        DB --> API : OK
+        deactivate DB
+        note right of API #FFFFE0
+          Transition nette du statut au sein de la
+          meme requete : "generated"/"approved" -> "rejected"
+          (transitoire) -> "generated".
+        end note
+    end
+    API -> DB : commit()
+    API --> UI : {dossier_id, section_key, action, status}
+end
+deactivate API
+UI --> User : Confirmation de la decision
+deactivate UI
+
+== ETAPE 9 : Export du document final ==
+
+note right of API #FFFFE0
+  Declenche uniquement via la conversation
+  (intent="export", ETAPE 5) ; l'endpoint
+  GET /dossiers/{id}/export.{fmt} ne fait que
+  televerser un export DEJA genere (404 sinon).
+end note
+
+activate API #ADD8E6
+API -> DB : charge la DERNIERE version de\nGeneration pour chaque OutlineItem\n(sections sans generation = ignorees)
+activate DB #F08080
+DB --> API : liste des sections a exporter
+deactivate DB
+
+alt format demande hors {docx, pdf, md, txt}
+    API -> API : leve ValueError
+else format valide
+    API -> API : rendu (_build_docx / _build_pdf /\n_build_markdown / _build_txt)
+    note right of API #FFFFE0
+      Rendu pur : le contenu vient uniquement des
+      Generation deja persistees, AUCUN nouvel
+      appel LLM ici.
+    end note
+    API -> MinIO : PUT export\nkey = tenant_id/exports/dossier_id/v{version}.{ext}
+    activate MinIO #E0D0F0
+    MinIO --> API : OK
+    deactivate MinIO
+    API -> DB : INSERT Export,\ndossier.current_version += 1,\ndossier.status = "exported"
+    activate DB #F08080
+    DB --> API : OK
+    deactivate DB
+end
+deactivate API
+
+== FLUX HISTORIQUE V1 (endpoint non-streamant, plus simple, toujours present) ==
+
+note over User, DB #F0F8FF
+  POST /conversations/{id}/messages (SANS /stream) utilise
+  encore aujourd'hui app/workflow/graph.py (LangGraph V1) :
+  1 seul noeud de routage PAR MOTS-CLES (pas de LLM) qui
+  distingue export / run_section / smalltalk / hybrid_rag,
+  PUIS 1 seule recherche hybride (top_k=8, sans CRAG, sans
+  reranker applique dans ce chemin) ET 1 seul appel Ollama
+  qui produit directement du Markdown libre (pas de JSON
+  contraint, donc AUCUNE validation de citations).
+  generate_all y reutilise le MEME contexte pour toutes
+  les sections (contrairement a l'ETAPE 5 du flux V2
+  ci-dessus, qui relance une recherche par section).
+  A noter : app/workflow/nodes/validate.py existe mais
+  n'est branche nulle part (code mort) ; ce flux V1 n'a
+  donc aucune etape de validation reelle.
+end note
+
+' ==========================================================================
+' LEGENDE
+' ==========================================================================
+legend right
+  | <color:#FFD700>Redacteur</color> | Acteur humain |
+  | <color:#87CEEB>Interface Web</color> | Frontend React, connexion SSE |
+  | <color:#ADD8E6>API FastAPI</color> | Endpoints REST/SSE, regles d'acces |
+  | <color:#FFB6C1>Orchestrateur</color> | rewrite -> superviseur -> dispatch -> aggregate |
+  | <color:#90EE90>LLM Ollama</color> | Un seul modele pour tout (routage, extraction, generation, jugement CRAG) |
+  | <color:#98FB98>Experts RAG</color> | Recherche hybride par domaine, avec ou sans boucle CRAG |
+  | <color:#C8A2C8>Expert Graphe</color> | Traduction question -> entites -> requetes Cypher fixes |
+  | <color:#FFDAB9>Reranker</color> | En realite un score lexical + RRF, pas un cross-encoder |
+  | <color:#87CEFA>Qdrant</color> | Recherche dense (vecteurs) |
+  | <color:#F08080>Postgres</color> | Recherche sparse (FTS) + toutes les tables metier |
+  | <color:#D3D3A0>Neo4j</color> | Graphe de connaissances (lecture) |
+  | <color:#E0D0F0>MinIO</color> | Stockage des exports generes |
+endlegend
+
+@enduml

@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.models.sql import Session as DbSession
 from app.models.sql import Tenant, User
+from app.services.audit import record_audit
 from app.services.db_client import get_session
 from app.services.security import create_access_token, decode_access_token, verify_password
 
@@ -118,13 +119,33 @@ async def login(body: LoginRequest, request: Request, session: AsyncSession = De
     if user is None or not verify_password(body.password, user.hashed_password):
         if user is not None:
             user.login_attempts = (user.login_attempts or 0) + 1
+            await record_audit(
+                session, tenant_id=user.tenant_id, user_id=user.id, action_type="login",
+                resource_type="user", resource_id=user.id, request=request,
+                success=False, error_message="Mot de passe incorrect",
+            )
             await session.commit()
+        # user is None (email inconnu) : aucun tenant à qui rattacher une
+        # ligne d'audit — rien de exploitable à journaliser dans ce schéma
+        # scopé par tenant.
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Identifiants incorrects")
     if user.status != "active":
+        await record_audit(
+            session, tenant_id=user.tenant_id, user_id=user.id, action_type="login",
+            resource_type="user", resource_id=user.id, request=request,
+            success=False, error_message="Compte suspendu",
+        )
+        await session.commit()
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Compte suspendu")
 
     tenant = await session.get(Tenant, user.tenant_id)
     if tenant is None or tenant.status != "active":
+        await record_audit(
+            session, tenant_id=user.tenant_id, user_id=user.id, action_type="login",
+            resource_type="user", resource_id=user.id, request=request,
+            success=False, error_message="Entreprise suspendue",
+        )
+        await session.commit()
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Entreprise suspendue")
 
     user.login_attempts = 0
@@ -138,8 +159,13 @@ async def login(body: LoginRequest, request: Request, session: AsyncSession = De
             user_id=user.id,
             token_hash=_token_hash(token),
             user_agent=(request.headers.get("user-agent") or "")[:512],
+            ip_address=request.client.host if request.client else None,
             expires_at=expires,
         )
+    )
+    await record_audit(
+        session, tenant_id=tenant.id, user_id=user.id, action_type="login",
+        resource_type="user", resource_id=user.id, request=request, success=True,
     )
     await session.commit()
     return LoginResponse(access_token=token, user=_public(user, tenant))
@@ -155,6 +181,7 @@ async def me(user: User = Depends(get_current_user), session: AsyncSession = Dep
 
 @router.post("/logout")
 async def logout(
+    request: Request,
     authorization: str | None = Header(default=None),
     session: AsyncSession = Depends(get_session),
 ):
@@ -166,5 +193,11 @@ async def logout(
         if row is not None:
             row.revoked = True
             row.revoked_at = datetime.now(UTC)
+            owner = await session.get(User, row.user_id)
+            if owner is not None:
+                await record_audit(
+                    session, tenant_id=owner.tenant_id, user_id=owner.id, action_type="logout",
+                    resource_type="user", resource_id=owner.id, request=request, success=True,
+                )
             await session.commit()
     return {"ok": True}

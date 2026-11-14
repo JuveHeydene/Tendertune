@@ -1,0 +1,39 @@
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_HTTP_TIMEOUT=120 \
+    PATH="/app/.venv/bin:$PATH"
+
+WORKDIR /app
+
+# Attente des services = scripts/wait_for.py (stdlib). Contrairement à
+# l'image API, celle-ci fait de l'apt-get : le wheel paddlepaddle-gpu exige
+# des libs système absentes de python:3.12-slim (testé en live avant d'écrire
+# ce Dockerfile — ImportError: libgomp.so.1). Sans passthrough GPU réel côté
+# hôte (nvidia-container-toolkit), PaddlePaddle GPU bascule proprement en
+# CPU au runtime (juste plus lent par page) — voir _try_paddle() dans
+# app/ingest/parse.py.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgomp1 libgl1 libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+COPY pyproject.toml uv.lock ./
+# Seule autre différence avec Dockerfile (image API) : extra ocr-gpu —
+# PaddleOCR + PaddlePaddle GPU + PyMuPDF, nécessaires pour lire un DAO
+# scanné (§ingestion scan). Volontairement PAS dans l'image API
+# (pyproject.toml commentaire ocr/ocr-gpu) : seul le worker ingère.
+RUN uv sync --frozen --no-dev --no-install-project --extra ocr-gpu
+
+COPY app/ ./app/
+COPY scripts/ ./scripts/
+COPY docker-entrypoint.sh docker-entrypoint-worker.sh ./
+
+RUN chmod +x docker-entrypoint.sh docker-entrypoint-worker.sh
+
+ENTRYPOINT ["./docker-entrypoint-worker.sh"]

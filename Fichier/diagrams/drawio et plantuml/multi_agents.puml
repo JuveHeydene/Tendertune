@@ -1,0 +1,82 @@
+@startuml multi_agents
+' =============================================================================
+' Organisation multi-agent de l'horloge B : superviseur, agents experts de
+' récupération, agrégation puis génération.
+' Principe structurant : aucun expert ne rédige — seul le générateur produit
+' du texte.
+' =============================================================================
+skinparam backgroundColor white
+skinparam defaultFontName "Latin Modern Roman"
+skinparam defaultFontColor black
+skinparam defaultFontSize 14
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam ArrowColor #444444
+skinparam ArrowFontSize 12
+skinparam nodesep 16
+skinparam ranksep 22
+
+skinparam rectangle {
+  BorderColor #555555
+  FontSize 13
+}
+skinparam package {
+  BorderColor #777777
+  BackgroundColor #FBFBFB
+  FontSize 13
+  FontStyle bold
+}
+
+title Organisation multi-agent de l'horloge B
+
+actor "Utilisateur" as U #FFD966
+
+rectangle "**Reformulation**\n<size:11><i>lève les références implicites</i></size>" as RW #9DC3E6
+rectangle "**Superviseur**\n<size:11><i>intention · décomposition</i></size>\n<size:11><i>choix des experts</i></size>" as SUP #D9B3D9
+
+rectangle "**Boîte à outils commune**\n<size:11><i>recherche lexicale</i></size>\n<size:11><i>recherche sémantique</i></size>\n<size:11><i>ré-ordonnancement</i></size>\n<size:11><i>interrogation structurée</i></size>\n<size:11><i>interrogation du graphe</i></size>\n<size:11><i>résolution d'entités</i></size>" as TOOLS #FBE5B6
+
+package "Agents experts — récupération uniquement, aucune rédaction" as PEXP {
+  rectangle "Juridique" as E1 #C6E0B4
+  rectangle "Technique" as E2 #C6E0B4
+  rectangle "Financier" as E3 #C6E0B4
+  rectangle "Graphe" as E4 #C6E0B4
+  rectangle "Patrimoine" as E5 #C6E0B4
+}
+
+rectangle "**Boucle bornée**\n<size:11><i>1. recherche hybride</i></size>\n<size:11><i>2. ré-ordonnancement</i></size>\n<size:11><i>3. évaluation du contexte</i></size>\n<size:11><i>4. reprise ou abstention</i></size>" as LOOP #FBE5B6
+
+rectangle "**Agrégateur**\n<size:11><i>fusionne contextes retenus</i></size>\n<size:11><i>et abstentions</i></size>" as AGG #AED6F1
+rectangle "**Générateur**\n<size:11><i>seul composant qui rédige :</i></size>\n<size:11><i>une sortie structurée, un seul appel</i></size>" as GEN #F4B6C2
+rectangle "**Validation déterministe**\n<size:11><i>schéma · citations · cohérence</i></size>" as VAL #F4B6C2
+rectangle "**Revue humaine**\n<size:11><i>approuver, corriger, relancer</i></size>" as HITL #FFD966
+rectangle "**Réponse ou section validée**" as OUT #E8DAEF
+
+' --- contraintes de placement (invisibles)
+E1 -[hidden]right- E2
+E2 -[hidden]right- E3
+E3 -[hidden]right- E4
+E4 -[hidden]right- E5
+TOOLS -[hidden]down- LOOP
+
+U -down-> RW : question ou\ndemande de rédaction
+RW -down-> SUP : demande clarifiée
+
+SUP -down-> E1
+SUP -down-> E2
+SUP -down-> E3 : routage vers\nles experts utiles
+SUP -down-> E4
+SUP -down-> E5
+
+TOOLS .right.> PEXP
+PEXP .right.> LOOP : une boucle bornée\npar sous-question
+
+PEXP -down-> AGG : contextes gradés\nou abstentions
+AGG -down-> GEN
+GEN -down-> VAL
+VAL -down-> HITL : succès
+VAL -up-> GEN : échec (reprise bornée)
+HITL -down-> OUT
+OUT -up-> U : restitution
+
+@enduml

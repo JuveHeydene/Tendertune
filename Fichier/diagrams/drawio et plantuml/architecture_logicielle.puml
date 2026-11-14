@@ -1,0 +1,96 @@
+@startuml architecture_logicielle
+' =============================================================================
+' Architecture logicielle en couches : présentation, passerelle applicative,
+' orchestration, traitement, persistance. Vocabulaire générique.
+' =============================================================================
+skinparam backgroundColor white
+skinparam defaultFontName "Latin Modern Roman"
+skinparam defaultFontColor black
+skinparam defaultFontSize 14
+skinparam shadowing false
+skinparam roundCorner 4
+skinparam ArrowColor #444444
+skinparam ArrowFontSize 12
+skinparam componentStyle uml2
+skinparam nodesep 14
+skinparam ranksep 26
+
+skinparam component {
+  BorderColor #555555
+  FontSize 13
+}
+skinparam package {
+  BorderColor #777777
+  BackgroundColor #FBFBFB
+  FontSize 14
+  FontStyle bold
+}
+skinparam database {
+  BorderColor #555555
+  FontSize 12
+}
+
+title Architecture logicielle en couches
+
+package "Couche présentation" as L1 {
+  component "Espace\ndocumentaire" as I1 #9DC3E6
+  component "Espace\nconversationnel" as I2 #9DC3E6
+  component "Espace\nde rédaction" as I3 #9DC3E6
+}
+
+package "Couche passerelle applicative" as L2 {
+  component "Authentification\net habilitations" as G1 #B4C7E7
+  component "Cloisonnement\npar organisation" as G2 #B4C7E7
+  component "Points d'entrée\net flux d'événements" as G3 #B4C7E7
+}
+
+package "Couche orchestration" as L3 {
+  component "Orchestrateur\nde conversation" as O1 #D9B3D9
+  component "Superviseur\nmulti-agent" as O2 #D9B3D9
+  component "Boucle de\nrécupération" as O3 #D9B3D9
+  component "Workflow\nde dossier" as O4 #D9B3D9
+}
+
+package "Couche traitement" as L4 {
+  component "Chaîne\nd'ingestion" as T1 #C6E0B4
+  component "Recherche\nhybride" as T2 #C6E0B4
+  component "Extraction\net graphe" as T3 #C6E0B4
+  component "Génération et\nmise en forme" as T4 #C6E0B4
+}
+
+package "Couche persistance" as L5 {
+  database "Base\nrelationnelle" as P1 #AED6F1
+  database "Index vectoriel\net lexical" as P2 #AED6F1
+  database "Base graphe" as P3 #D7DBA0
+  database "Stockage objet" as P4 #FFD966
+  queue "File de travaux" as P5 #FBE5B6
+}
+
+package "Services transverses" as LM {
+  component "Services de modèles\n<size:11><i>langage · plongement</i></size>" as MODELS #F4B6C2
+}
+
+I2 -down-> G3 : requêtes et flux
+G3 -down-> O1
+O1 -down-> O2
+O2 -down-> O3
+O1 -down-> O4
+
+O3 -down-> T2
+O4 -down-> T4
+G3 -down-> T1 : dépôt de document
+
+T1 -down-> P2
+T1 -down-> P4
+T1 -down-> P5
+T2 -down-> P2
+T3 -down-> P3
+T4 -down-> P1
+
+O2 .right.> MODELS : appels contraints
+T2 .right.> MODELS : vectorisation
+
+L5 -[hidden]right- LM
+L4 -[hidden]right- LM
+
+@enduml

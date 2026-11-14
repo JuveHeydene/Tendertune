@@ -6,15 +6,25 @@ existant (app.rag.experts) sans rien réinventer.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.graph.entity_match import EntityMatchIndex
-from app.models.pydantic import Complexite, Expert
-from app.models.sql import ChunkRow, Document, DossierPiece, Dossier, ExigenceRow, OutlineItem
+from app.models.pydantic import Complexite, Expert, SourceContexte
+from app.models.sql import (
+    ChunkRow,
+    Document,
+    Dossier,
+    DossierPiece,
+    ExigenceRow,
+    ExigenceSection,
+    OutlineItem,
+)
 from app.rag.experts import run_expert
 from app.services.db_client import session_factory
 from app.services.ollama_llm import ollama_generate_json
@@ -57,8 +67,10 @@ Texte :
 {text}
 """
 
-_EXIGENCES_PROMPT = """Tu extraies les exigences d'un extrait de dossier
-d'appel d'offres BTP (DAO).
+_EXIGENCES_PROMPT = """Tu extraies les exigences d'extraits d'un dossier
+d'appel d'offres BTP (DAO). Le texte ci-dessous peut contenir PLUSIEURS
+extraits séparés par "--- Extrait page N ---" : traite-les tous et cumule
+toutes les exigences trouvées dans une seule liste.
 Catégories de type autorisées uniquement : eliminatoire, technique,
 administrative, financiere, delai, reference.
 Réponds UNIQUEMENT en JSON :
@@ -72,6 +84,23 @@ demandées dans un appel d'offres BTP. Extrais la liste des pièces.
 Réponds UNIQUEMENT en JSON : {{"pieces": ["...", "..."]}}
 Texte :
 {text}
+"""
+
+_CLASSIFY_SECTIONS_PROMPT = """Tu associes des exigences d'un dossier
+d'appel d'offres BTP aux sections du mémoire technique qui doivent y
+répondre explicitement. Une exigence peut concerner PLUSIEURS sections, ou
+aucune si elle ne correspond à rien de rédactionnel (ex. une pièce
+administrative pure comme un KBIS n'a souvent aucune section dédiée) — dans
+ce cas omets-la simplement, ne force pas une association.
+
+Sections disponibles (index. titre [archétype]) :
+{sections}
+
+Exigences à classer (index. libellé [type]) :
+{exigences}
+
+Réponds UNIQUEMENT en JSON :
+{{"associations": [{{"exigence_index": 1, "section_indices": [2, 5]}}]}}
 """
 
 
@@ -109,7 +138,9 @@ async def extract_outline(session, dossier: Dossier) -> int:
         lowered = combined.lower()
         if any(k in lowered for k in _OUTLINE_KEYWORDS):
             try:
-                body = ollama_generate_json(_OUTLINE_PROMPT.format(text=combined[:4000]), timeout=90)
+                body = await asyncio.to_thread(
+                    ollama_generate_json, _OUTLINE_PROMPT.format(text=combined[:4000]), timeout=90, num_ctx=2048
+                )
                 candidates = [str(t).strip() for t in (body.get("titres") or []) if str(t).strip()]
                 if candidates:
                     titres = candidates
@@ -179,27 +210,85 @@ def _dedup_exigences(raw: list[dict]) -> list[dict]:
     return kept
 
 
+_EXIGENCES_BATCH_MAX_CHARS = 14000  # ~3500 tokens, avec num_ctx=4096 explicite (marge prompt+JSON)
+_EXIGENCES_PARENT_MAX_CHARS = 3500
+_EXIGENCES_NUM_CTX = 4096
+
+
+def _batch_parents(parents: list[ChunkRow], max_chars: int = _EXIGENCES_BATCH_MAX_CHARS) -> list[list[ChunkRow]]:
+    """Regroupe des chunks parents consécutifs jusqu'à `max_chars` cumulés —
+    un DAO volumineux (150+ pages) fait sinon 1 appel LLM séquentiel par
+    parent (des heures, et le job dépasse le job_timeout ARQ, qui le relance
+    depuis zéro en boucle sans jamais aboutir). Contrepartie acceptée : la
+    page source d'une exigence devient l'ancre du batch, pas une page
+    précise (choix explicite, moins fin mais ~5-8x plus rapide)."""
+    batches: list[list[ChunkRow]] = []
+    current: list[ChunkRow] = []
+    current_len = 0
+    for p in parents:
+        text_len = min(len(p.text), _EXIGENCES_PARENT_MAX_CHARS)
+        if current and current_len + text_len > max_chars:
+            batches.append(current)
+            current = []
+            current_len = 0
+        current.append(p)
+        current_len += text_len
+    if current:
+        batches.append(current)
+    return batches
+
+
 async def extract_exigences(session, dossier: Dossier) -> int:
     if not dossier.dao_document_id:
         return 0
-    parents = await _all_parents(session, dossier.dao_document_id)
-    log.info("extract_exigences — %d parents à traiter (pas de limite à 12), dossier=%s", len(parents), dossier.id)
+    # BPU (bordereau de prix unitaires) = tableaux de prix, jamais des
+    # exigences qualitatives — l'exclure évite des appels LLM inutiles sur
+    # un très gros DAO.
+    parents = [p for p in await _all_parents(session, dossier.dao_document_id) if p.section_type != "bpu"]
+    batches = _batch_parents(parents)
+    log.info(
+        "extract_exigences — %d parents regroupés en %d appels LLM (dossier=%s)",
+        len(parents), len(batches), dossier.id,
+    )
 
     raw: list[dict] = []
-    for parent in parents:
+    for batch in batches:
+        combined = "\n\n".join(
+            f"--- Extrait page {p.page if p.page is not None else '?'} ---\n{p.text[:_EXIGENCES_PARENT_MAX_CHARS]}"
+            for p in batch
+        )
+        pages = [p.page for p in batch if p.page is not None]
+        page_anchor = min(pages) if pages else None
         try:
-            body = ollama_generate_json(_EXIGENCES_PROMPT.format(text=parent.text[:3500]), timeout=90)
+            body = await asyncio.to_thread(
+                ollama_generate_json,
+                _EXIGENCES_PROMPT.format(text=combined[:15000]),
+                timeout=150,
+                num_ctx=_EXIGENCES_NUM_CTX,
+            )
         except Exception as exc:
-            log.warning("extract_exigences — échec LLM sur un parent : %s", exc)
+            log.warning("extract_exigences — échec LLM sur un batch (%d parents) : %s", len(batch), exc)
             continue
         for ex in body.get("exigences") or []:
             etype = str(ex.get("type", "")).lower()
             if etype not in ("eliminatoire", "technique", "administrative", "financiere", "delai", "reference"):
                 continue
-            ex["_page_source"] = parent.page
+            ex["_page_source"] = page_anchor
             raw.append(ex)
 
     deduped = _dedup_exigences(raw)
+
+    # Purge avant réinsertion — sans ça, relancer l'analyse d'un dossier
+    # (reprise après échec partiel, ou nouvelle analyse volontaire) doublait
+    # les exigences à chaque passage (même bug que les vecteurs Qdrant
+    # orphelins côté ingestion, §app/ingest/index_qdrant.delete_by_document).
+    existing = (
+        await session.execute(select(ExigenceRow).where(ExigenceRow.dossier_id == dossier.id))
+    ).scalars().all()
+    for row in existing:
+        await session.delete(row)
+    await session.flush()
+
     n = 0
     for ex in deduped:
         session.add(
@@ -227,7 +316,9 @@ async def extract_checklist_administrative(session, dossier: Dossier) -> int:
         combined = "\n".join(p.text for p in rc_parents)
         if any(k in combined.lower() for k in _PIECES_KEYWORDS):
             try:
-                body = ollama_generate_json(_PIECES_PROMPT.format(text=combined[:4000]), timeout=90)
+                body = await asyncio.to_thread(
+                    ollama_generate_json, _PIECES_PROMPT.format(text=combined[:4000]), timeout=90, num_ctx=2048
+                )
                 candidates = [str(p).strip() for p in (body.get("pieces") or []) if str(p).strip()]
                 if candidates:
                     pieces = candidates
@@ -287,6 +378,15 @@ async def extract_dossier_structure(ctx: dict, dossier_id: str) -> str:
         dossier.updated_at = datetime.now(UTC)
         await session.commit()
 
+        # Ré-analyse = remplacement, jamais un cumul. Sans ça, deux exécutions
+        # sur le même dossier (retry ARQ après un job_timeout, double-clic,
+        # nouveau DAO chargé...) dupliquent les exigences — observé en
+        # conditions réelles : un job relancé après coup a bien failli
+        # doubler les 95 exigences déjà extraites avec succès.
+        await session.execute(delete(ExigenceRow).where(ExigenceRow.dossier_id == dossier.id))
+        await session.execute(delete(OutlineItem).where(OutlineItem.dossier_id == dossier.id))
+        await session.flush()
+
         try:
             n_outline = await extract_outline(session, dossier)
             n_exigences = await extract_exigences(session, dossier)
@@ -306,22 +406,142 @@ async def extract_dossier_structure(ctx: dict, dossier_id: str) -> str:
     return f"done:{dossier_id}"
 
 
+_CLASSIFY_BATCH_SIZE = 25  # ~25 libellés courts + la liste des sections tient large dans num_ctx=4096
+
+
+async def classify_exigences_sections(session, dossier: Dossier) -> int:
+    """Associe chaque exigence aux sections du plan qui doivent y répondre
+    (§ liaison exigences/sections). Ne touche JAMAIS un couple déjà décidé
+    (confirmé ou exclu) — seuls les couples (exigence, section) inédits
+    reçoivent une proposition LLM, via ON CONFLICT DO NOTHING sur la
+    contrainte unique (exigence_id, outline_item_id) : relancer la
+    classification après qu'un humain a confirmé/exclu des liens ne les
+    écrase jamais, ça ne fait que compléter les couples encore inconnus."""
+    outline_rows = (
+        await session.execute(
+            select(OutlineItem).where(OutlineItem.dossier_id == dossier.id).order_by(OutlineItem.sort_order)
+        )
+    ).scalars().all()
+    exigence_rows = (
+        await session.execute(select(ExigenceRow).where(ExigenceRow.dossier_id == dossier.id))
+    ).scalars().all()
+    if not outline_rows or not exigence_rows:
+        return 0
+
+    sections_block = "\n".join(f"{i + 1}. {o.title} [{o.archetype}]" for i, o in enumerate(outline_rows))
+
+    n_created = 0
+    for start in range(0, len(exigence_rows), _CLASSIFY_BATCH_SIZE):
+        batch = exigence_rows[start : start + _CLASSIFY_BATCH_SIZE]
+        exigences_block = "\n".join(f"{i + 1}. {e.libelle} [{e.type}]" for i, e in enumerate(batch))
+        try:
+            body = await asyncio.to_thread(
+                ollama_generate_json,
+                _CLASSIFY_SECTIONS_PROMPT.format(sections=sections_block, exigences=exigences_block),
+                timeout=150,
+                num_ctx=4096,
+            )
+        except Exception as exc:
+            log.warning("classify_exigences_sections — échec LLM sur un batch (%d exigences) : %s", len(batch), exc)
+            continue
+
+        rows_to_insert: list[dict] = []
+        for assoc in body.get("associations") or []:
+            try:
+                ex_idx = int(assoc.get("exigence_index")) - 1
+            except (TypeError, ValueError):
+                continue
+            if not (0 <= ex_idx < len(batch)):
+                continue
+            for sec_idx_raw in assoc.get("section_indices") or []:
+                try:
+                    sec_idx = int(sec_idx_raw) - 1
+                except (TypeError, ValueError):
+                    continue
+                if not (0 <= sec_idx < len(outline_rows)):
+                    continue
+                rows_to_insert.append(
+                    {
+                        "exigence_id": batch[ex_idx].id,
+                        "outline_item_id": outline_rows[sec_idx].id,
+                        "origine": "llm",
+                        "statut": "proposee",
+                    }
+                )
+        if not rows_to_insert:
+            continue
+        stmt = pg_insert(ExigenceSection).values(rows_to_insert).on_conflict_do_nothing(
+            index_elements=["exigence_id", "outline_item_id"]
+        )
+        result = await session.execute(stmt)
+        n_created += result.rowcount or 0
+
+    await session.flush()
+    log.info(
+        "classify_exigences_sections — %d liens créés (dossier=%s, %d exigences, %d sections)",
+        n_created, dossier.id, len(exigence_rows), len(outline_rows),
+    )
+    return n_created
+
+
+async def classify_dossier_sections(ctx: dict, dossier_id: str) -> str:
+    """Job ARQ — classification exigences/sections. Séparé de
+    extract_dossier_structure : peut être relancé indépendamment (ex. après
+    ajout manuel d'exigences ou de sections) sans retoucher outline/
+    exigences déjà extraits."""
+    log.info("======== CLASSIFY SECTIONS DÉBUT dossier_id=%s ========", dossier_id)
+    factory = session_factory()
+    async with factory() as session:
+        dossier = await session.get(Dossier, UUID(dossier_id))
+        if dossier is None:
+            log.error("CLASSIFY SECTIONS — dossier introuvable id=%s", dossier_id)
+            return f"missing:{dossier_id}"
+        dossier.classification_status = "running"
+        dossier.classification_error = None
+        dossier.updated_at = datetime.now(UTC)
+        await session.commit()
+
+        try:
+            n = await classify_exigences_sections(session, dossier)
+            dossier.classification_status = "ready"
+            dossier.updated_at = datetime.now(UTC)
+            await session.commit()
+        except Exception as exc:
+            await session.rollback()
+            dossier = await session.get(Dossier, UUID(dossier_id))
+            if dossier is not None:
+                dossier.classification_status = "failed"
+                dossier.classification_error = f"{type(exc).__name__}: {exc}"[:2000]
+                dossier.updated_at = datetime.now(UTC)
+                await session.commit()
+            log.exception("CLASSIFY SECTIONS ÉCHEC dossier_id=%s : %s", dossier_id, exc)
+            return f"failed:{dossier_id}"
+
+    log.info("======== CLASSIFY SECTIONS FIN dossier_id=%s liens=%d ========", dossier_id, n)
+    return f"ready:{dossier_id}"
+
+
 async def cover_exigence(exigence_id: UUID, *, tenant_id: UUID) -> None:
     """Réutilise le CRAG existant (app.rag.experts) — AUCUNE nouvelle
-    mécanique de recherche, juste un nouvel appelant (§9 étape 4)."""
+    mécanique de recherche, juste un nouvel appelant (§9 étape 4).
+
+    Le passage à `statut="en_cours"` est fait par l'appelant (endpoint HTTP,
+    voir app/api/dossiers.py) AVANT de planifier cette tâche de fond, pas
+    ici — sinon la fenêtre entre le clic et la première ligne de cette
+    fonction laissait passer un second clic (double recherche concurrente)."""
     factory = session_factory()
     async with factory() as session:
         exigence = await session.get(ExigenceRow, exigence_id)
         if exigence is None:
             return
-        exigence.statut = "en_cours"
-        await session.commit()
+        libelle = exigence.libelle
+        dossier_id = exigence.dossier_id
 
     resultat = await run_expert(
         Expert.patrimoine,
-        exigence.libelle,
+        libelle,
         tenant_id=tenant_id,
-        dossier_id=exigence.dossier_id,
+        dossier_id=dossier_id,
         message_id=None,
         sous_question_index=0,
         complexite=Complexite.complexe,
@@ -331,11 +551,26 @@ async def cover_exigence(exigence_id: UUID, *, tenant_id: UUID) -> None:
         exigence = await session.get(ExigenceRow, exigence_id)
         if exigence is None:
             return
-        if resultat.chunks:
+        # `resultat.chunks` seul ne suffit PAS à conclure à une couverture :
+        # en cas d'abstention CRAG (aucun contexte jugé "correct" après 3
+        # tentatives), run_expert renvoie quand même les derniers candidats
+        # trouvés, non jugés pertinents — les traiter comme "couverte" serait
+        # trompeur. On distingue donc :
+        #  - source=retrieval (grading a validé le contexte)      → couverte
+        #  - abstention avec des candidats quand même remontés    → a_revoir
+        #    (décision humaine nécessaire, ni couvert ni exclu)
+        #  - abstention sans le moindre candidat                  → non_couverte
+        if resultat.source == SourceContexte.retrieval and resultat.chunks:
             exigence.statut = "couverte"
             exigence.preuves_chunks = [c.chunk_id for c in resultat.chunks[:5]]
             exigence.couverte_at = datetime.now(UTC)
+        elif resultat.chunks:
+            exigence.statut = "a_revoir"
+            exigence.preuves_chunks = [c.chunk_id for c in resultat.chunks[:5]]
+            exigence.couverte_at = None
         else:
             exigence.statut = "non_couverte"
+            exigence.preuves_chunks = []
+            exigence.couverte_at = None
         exigence.updated_at = datetime.now(UTC)
         await session.commit()

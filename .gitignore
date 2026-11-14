@@ -31,3 +31,43 @@ tmp/
 # OS
 .DS_Store
 Thumbs.db
+
+# Variantes d'env (seul .env.example est versionné)
+.env.*
+!.env.example
+
+# Agents / outils locaux
+.claude/
+
+# Corpus clients et données de fine-tuning — JAMAIS sur GitHub (confidentiel Elatech)
+corpus/
+finetuning/data/
+*.docx
+*.xlsx
+*.xls
+uploads/
+exports/
+
+# Poids de modèles, adaptateurs LoRA, suivi d'expériences
+*.safetensors
+*.gguf
+*.bin
+*.pt
+*.onnx
+adapters/
+checkpoints/
+mlruns/
+mlartifacts/
+wandb/
+
+# Volumes Docker locaux
+qdrant_storage/
+neo4j_data/
+minio_data/
+pg_data/
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Documents PDF (articles, rapports, exports) : jamais dans le dépôt
+*.pdf

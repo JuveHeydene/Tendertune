@@ -119,6 +119,12 @@ class Document(Base):
     status: Mapped[str] = mapped_column(String(32), default="pending")
     graph_extracted: Mapped[bool] = mapped_column(Boolean, default=False)
     ingest_error: Mapped[str | None] = mapped_column(Text)
+    # V2.1 — horodatage début/fin par phase (parse/chunk/classify/embed/index/graph),
+    # affiché dans le détail du document (§ interface).
+    pipeline_stages: Mapped[dict] = mapped_column(JSONB, default=dict)
+    # V2.1 — reprise OCR page par page après interruption (timeout de tâche,
+    # crash worker) : {"resume_page": N, "pages": {"1": {...}, ...}}
+    ocr_progress: Mapped[dict] = mapped_column(JSONB, default=dict)
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     size_bytes: Mapped[int | None] = mapped_column(BigInteger)
     mime_type: Mapped[str | None] = mapped_column(String(128))
@@ -169,6 +175,9 @@ class Dossier(Base):
     deadline: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     status: Mapped[str] = mapped_column(String(32), default="draft")
     current_version: Mapped[int] = mapped_column(Integer, default=1)
+    # V2.2 — suivi du job "classifier les exigences par section".
+    classification_status: Mapped[str | None] = mapped_column(String(32))
+    classification_error: Mapped[str | None] = mapped_column(Text)
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -206,6 +215,23 @@ class OutlineItem(Base):
     # lookup direct, jamais un agent qui choisit.
     archetype: Mapped[str] = mapped_column(String(16), default="factuelle")
     custom_instruction: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ExigenceSection(Base):
+    """Liaison N:N exigence <-> section — voir migration 004 pour le détail
+    du raisonnement origine/statut. Consommée par generate_section() pour
+    injecter les exigences réelles à traiter dans le prompt de rédaction."""
+
+    __tablename__ = "exigence_sections"
+    __table_args__ = (UniqueConstraint("exigence_id", "outline_item_id", name="unique_exigence_section"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    exigence_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("exigences.id", ondelete="CASCADE"), nullable=False)
+    outline_item_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("outline_items.id", ondelete="CASCADE"), nullable=False)
+    origine: Mapped[str] = mapped_column(String(16), default="humain")
+    statut: Mapped[str] = mapped_column(String(16), default="confirmee")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -258,7 +284,17 @@ class Conversation(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    messages: Mapped[list["Message"]] = relationship(back_populates="conversation")
+    # cascade+passive_deletes : sans ça, supprimer une conversation dont les
+    # messages sont déjà chargés (cas systématique — _load_conv fait un
+    # selectinload) fait tenter à SQLAlchemy de mettre conversation_id à
+    # NULL sur les messages au lieu de les supprimer — crash immédiat, la
+    # colonne est NOT NULL (bug réel reproduit : toute suppression de
+    # conversation ayant au moins un message échouait). passive_deletes=True
+    # laisse Postgres appliquer le ON DELETE CASCADE déjà présent sur la FK,
+    # sans que l'ORM charge/émette un DELETE par message.
+    messages: Mapped[list["Message"]] = relationship(
+        back_populates="conversation", cascade="all, delete-orphan", passive_deletes=True
+    )
 
 
 class Message(Base):
@@ -313,6 +349,10 @@ class RetrievalTrace(Base):
     grade_method: Mapped[str | None] = mapped_column(String(16))
     chunks_retournes: Mapped[list] = mapped_column(JSONB, default=list)
     abstention: Mapped[bool] = mapped_column(Boolean, default=False)
+    # V2.2 — clé de corrélation vers generations.context_snapshot, PAS une FK
+    # (voir migration 005 : la retrieval est commitée avant que la
+    # Generation existe, une FK ne pourrait jamais être satisfaite).
+    trace_batch_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

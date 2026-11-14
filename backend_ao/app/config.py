@@ -47,16 +47,21 @@ class Settings(BaseSettings):
     # LLM / embeddings — Ollama en local par défaut
     llm_provider: str = "ollama"
     ollama_base_url: str = "http://localhost:11434"
-    llm_model: str = "llama3"
+    # IBM Granite 3.3 2B : tient sur la RTX A5000 Laptop (16 Go) avec la marge
+    # nécessaire à PaddleOCR et au reranker ; c'est aussi la base du fine-tuning TenderTune.
+    llm_model: str = "granite3.3:2b"
     embed_provider: str = "ollama"
+    # embed_dim doit correspondre au modèle (nomic-embed-text = 768, bge-m3 = 1024) :
+    # changer de modèle impose une réindexation.
     embed_model: str = "nomic-embed-text"
+    embed_dim: int = 768
     rerank_model: str = "BAAI/bge-reranker-v2-m3"
 
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     log_level: str = "info"
     jwt_secret: str = "change-me-btp-rag-dev"
-    jwt_expire_minutes: int = 60
+    jwt_expire_minutes: int = 180
     admin_email: str = "admin@btp.local"
     admin_username: str = "admin"
     admin_password: str = "AdminChantier2026!"

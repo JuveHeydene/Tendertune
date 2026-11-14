@@ -92,6 +92,7 @@ async def run_expert(
     message_id: UUID | None,
     sous_question_index: int,
     complexite: Complexite,
+    trace_batch_id: UUID | None = None,
 ) -> ResultatExpert:
     """Ouvre et gère sa PROPRE session (au lieu d'en recevoir une partagée) :
     plusieurs experts peuvent ainsi tourner en vrai parallèle via
@@ -109,6 +110,7 @@ async def run_expert(
             message_id=message_id,
             sous_question_index=sous_question_index,
             complexite=complexite,
+            trace_batch_id=trace_batch_id,
         )
         await session.commit()
         return result
@@ -124,6 +126,7 @@ async def _run_expert_with_session(
     message_id: UUID | None,
     sous_question_index: int,
     complexite: Complexite,
+    trace_batch_id: UUID | None = None,
 ) -> ResultatExpert:
     scope = EXPERT_SCOPES.get(expert, {"section_types": None, "doc_roles": None})
     current_query = query
@@ -140,6 +143,7 @@ async def _run_expert_with_session(
             RetrievalTrace(
                 tenant_id=tenant_id,
                 message_id=message_id,
+                trace_batch_id=trace_batch_id,
                 sous_question_index=sous_question_index,
                 sous_question_texte=query,
                 expert=expert.value,
@@ -181,6 +185,7 @@ async def _run_expert_with_session(
             RetrievalTrace(
                 tenant_id=tenant_id,
                 message_id=message_id,
+                trace_batch_id=trace_batch_id,
                 sous_question_index=sous_question_index,
                 sous_question_texte=query,
                 expert=expert.value,
@@ -220,6 +225,7 @@ async def _run_expert_with_session(
         RetrievalTrace(
             tenant_id=tenant_id,
             message_id=message_id,
+            trace_batch_id=trace_batch_id,
             sous_question_index=sous_question_index,
             sous_question_texte=query,
             expert=expert.value,
@@ -245,7 +251,10 @@ async def _run_expert_with_session(
 
 async def _reformulate(query: str) -> str:
     try:
-        body = ollama_generate_json(_REWRITE_VARIANT_PROMPT.format(query=query), timeout=45)
+        # Prompt court (une seule requête de recherche) — num_ctx explicite
+        # quand même plutôt que de compter implicitement sur le défaut
+        # Ollama, pour que ce choix soit documenté et jamais une surprise.
+        body = ollama_generate_json(_REWRITE_VARIANT_PROMPT.format(query=query), timeout=45, num_ctx=2048)
         variant = str(body.get("query") or "").strip()
         return variant or query
     except Exception as exc:

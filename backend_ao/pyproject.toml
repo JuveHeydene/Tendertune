@@ -35,12 +35,19 @@ dependencies = [
     "minio>=7.2.0",
     "arq>=0.26.0",
     "redis>=5.0.0",
-    # Documents légers (pas d'OCR, pas de WeasyPrint)
+    # Documents
     "python-docx>=1.1.0",
     "pypdf>=5.0.0",
     "markdown>=3.6.0",
     "openpyxl>=3.1.0",
-    "reportlab>=4.2.0",
+    # Export PDF — rendu HTML/CSS (template Jinja2 dans app/templates/) ;
+    # nécessite libpango/cairo/gdk-pixbuf côté système (voir Dockerfile).
+    "weasyprint>=62.0",
+    # Déjà tiré transitivement par weasyprint — déclaré explicitement car
+    # utilisé directement (app/services/pieces_export.py : fusion PDF des
+    # pièces administratives, sans pymupdf réservé à l'extra OCR absent de
+    # l'image API).
+    "pillow>=10.1.0",
 ]
 
 [project.optional-dependencies]
@@ -65,7 +72,6 @@ embed-hf = [
     "sentence-transformers>=3.0.0",
 ]
 rerank = ["llama-index-postprocessor-flag-embedding-reranker>=0.2.0"]
-export-pdf = ["weasyprint>=62.0"]
 
 [dependency-groups]
 dev = [

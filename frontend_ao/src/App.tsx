@@ -9,6 +9,7 @@ import { RoleDashboard } from './pages/RoleDashboard'
 import { UsersPage } from './pages/admin/UsersPage'
 import { TenantsPage } from './pages/admin/TenantsPage'
 import { SessionsPage } from './pages/admin/SessionsPage'
+import { AuditLogsPage } from './pages/admin/AuditLogsPage'
 import { DocumentsPage } from './pages/DocumentsPage'
 import { ConversationThread } from './pages/ConversationsPage'
 import { DossiersPage } from './pages/DossiersPage'
@@ -75,6 +76,14 @@ export default function App() {
             element={
               <AdminOnly>
                 <SessionsPage />
+              </AdminOnly>
+            }
+          />
+          <Route
+            path="admin/audit"
+            element={
+              <AdminOnly>
+                <AuditLogsPage />
               </AdminOnly>
             }
           />

@@ -1,0 +1,105 @@
+@startuml sequence_ingestion_horloge_a
+skinparam backgroundColor white
+skinparam defaultFontName "Latin Modern Roman"
+skinparam defaultFontColor black
+skinparam defaultFontSize 15
+skinparam shadowing false
+skinparam sequenceMessageAlign center
+skinparam ArrowColor #333333
+skinparam sequenceLifeLineBorderColor #666666
+skinparam noteBorderColor #999999
+skinparam noteBackgroundColor #FFFFE0
+skinparam sequenceGroupBorderColor #666666
+skinparam sequenceGroupBackgroundColor #F5F5F5
+
+actor "Utilisateur" as U #FFD966
+participant "Interface\nconversationnelle" as UI #9DC3E6
+participant "Passerelle API" as API #B4C7E7
+participant "File de tâches" as Q #D9B3D9
+participant "Travailleur\nd'ingestion" as W #C6E0B4
+participant "Système de\ncompréhension\ndocumentaire" as P #F4B6C2
+participant "Classificateur\nde pièce" as CL #FBE5B6
+database "Base\nrelationnelle" as REL #F1948A
+database "Index vectoriel\net lexical" as VEC #AED6F1
+database "Base graphe" as GR #D7DBA0
+
+title Traitement d'une requête d'ingestion (horloge A)
+
+U -> UI : dépose un document
+activate UI
+UI -> API : envoie le fichier
+activate API
+API -> REL : vérifie les doublons,\ncrée l'enregistrement "en attente"
+activate REL
+REL --> API : identifiant du document
+deactivate REL
+API -> Q : place le traitement en file
+activate Q
+Q --> API : accusé
+deactivate Q
+API --> UI : confirmation immédiate
+deactivate API
+UI --> U : "document reçu, traitement en cours"
+deactivate UI
+
+Q -> W : distribue le traitement
+activate W
+
+W -> W : détecte le format\net la densité textuelle
+
+alt document numérique
+  W -> P : analyse structurelle directe
+else document numérisé ou image
+  W -> P : reconnaissance optique
+end
+activate P
+P --> W : texte structuré, indice de confiance
+deactivate P
+
+W -> W : découpage hiérarchique\n(parent / enfant)
+
+loop pour chaque segment de premier niveau
+  W -> CL : classifie la nature de la pièce
+  activate CL
+  alt motif normalisé reconnu
+    CL --> W : catégorie (confiance haute)
+  else aucun motif reconnu
+    CL -> CL : qualification par\nle moteur de langage
+    CL --> W : catégorie (confiance déclarée)
+  end
+  deactivate CL
+end
+
+par indexation double
+  W -> REL : écrit le texte et les métadonnées
+  activate REL
+  REL --> W : confirmation
+  deactivate REL
+else
+  W -> VEC : écrit les représentations\nsémantique et lexicale
+  activate VEC
+  VEC --> W : confirmation
+  deactivate VEC
+end
+
+W -> REL : statut = "prêt"
+activate REL
+REL --> W : ok
+deactivate REL
+
+opt extraction d'entités et de relations (seconde phase)
+  W -> GR : fusionne entités et relations détectées
+  activate GR
+  GR --> W : confirmation
+  deactivate GR
+end
+
+deactivate W
+
+note over W, GR
+  Une pièce visuelle sans contenu textuel exploitable
+  n'est pas un échec : elle est conservée comme actif
+  attachable au livrable, hors périmètre de la recherche.
+end note
+
+@enduml

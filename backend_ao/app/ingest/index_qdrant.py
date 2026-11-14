@@ -9,25 +9,31 @@ import urllib.request
 from uuid import UUID
 
 from qdrant_client import QdrantClient
-from qdrant_client.http.models import Distance, PointStruct, VectorParams
+from qdrant_client.http.models import Distance, FieldCondition, Filter, MatchValue, PointStruct, VectorParams
 
 from app.config import get_settings
 from app.ingest.chunk import ChunkDraft
 
 log = logging.getLogger("btp.embed")
 
-NOMIC_DIM = 768
-
-
 def ensure_collection() -> QdrantClient:
     s = get_settings()
     client = QdrantClient(url=s.qdrant_url)
     names = [c.name for c in client.get_collections().collections]
     if s.qdrant_collection not in names:
-        log.info("création collection Qdrant %s dim=%s", s.qdrant_collection, NOMIC_DIM)
+        log.info("création collection Qdrant %s dim=%s", s.qdrant_collection, s.embed_dim)
         client.create_collection(
             collection_name=s.qdrant_collection,
-            vectors_config=VectorParams(size=NOMIC_DIM, distance=Distance.COSINE),
+            vectors_config=VectorParams(size=s.embed_dim, distance=Distance.COSINE),
+        )
+        return client
+    # Collection créée avec un autre modèle d'embedding : on refuse d'y mélanger
+    # des vecteurs d'une autre dimension plutôt que d'échouer au premier upsert.
+    existing = client.get_collection(s.qdrant_collection).config.params.vectors.size
+    if existing != s.embed_dim:
+        raise RuntimeError(
+            f"Collection Qdrant {s.qdrant_collection} en dim={existing}, mais EMBED_MODEL={s.embed_model} "
+            f"attend EMBED_DIM={s.embed_dim} — supprimer la collection (ou changer QDRANT_COLLECTION) puis réindexer."
         )
     return client
 
@@ -63,13 +69,31 @@ def embed_texts(texts: list[str], *, quiet: bool = False) -> list[list[float]]:
             ) from exc
         vec = body.get("embedding")
         if not vec:
-            raise RuntimeError("Ollama n’a pas renvoyé d’embedding — modèle nomic-embed-text tiré ?")
+            raise RuntimeError(f"Ollama n’a pas renvoyé d’embedding — modèle {s.embed_model} tiré ?")
         if not quiet:
             log.info("Ollama embedding FIN %s/%s dim=%s", i + 1, len(texts), len(vec))
         vectors.append(vec)
     if not quiet:
         log.info("Ollama embeddings : tous les vecteurs reçus (%s)", len(vectors))
     return vectors
+
+
+def delete_by_document(client: QdrantClient, document_id: UUID) -> None:
+    """Supprime tous les points d'un document AVANT réindexation.
+
+    Bug corrigé : les chunks Postgres d'un document sont supprimés puis
+    recréés avec de NOUVEAUX id à chaque ré-ingestion (app/workers/ingest.py),
+    mais rien ne supprimait les anciens points Qdrant correspondants — une
+    relance (ré-ingestion manuelle, reprise après échec) laissait donc des
+    vecteurs orphelins, dupliquant le contenu en recherche."""
+    s = get_settings()
+    names = [c.name for c in client.get_collections().collections]
+    if s.qdrant_collection not in names:
+        return
+    client.delete(
+        collection_name=s.qdrant_collection,
+        points_selector=Filter(must=[FieldCondition(key="document_id", match=MatchValue(value=str(document_id)))]),
+    )
 
 
 def upsert_chunks(

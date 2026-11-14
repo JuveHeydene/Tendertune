@@ -114,6 +114,10 @@ class SectionGeneree(BaseModel):
     citations: list[str] = Field(default_factory=list)
     exigences_couvertes: list[str] = Field(default_factory=list)
     abstentions: list[str] = Field(default_factory=list)
+    # Positionné par le code (jamais par le LLM) selon generate_section(...,
+    # allow_proposal=...) — signale à l'UI d'afficher un avertissement
+    # "à valider", pas une info que le modèle pourrait s'attribuer lui-même.
+    is_proposal: bool = False
 
 
 # ---------------------------------------------------------------------------

@@ -17,11 +17,21 @@ from app.config import get_settings
 from app.models.pydantic import Intent
 from app.models.sql import Conversation, Message, User
 from app.services.chat_history import format_history
-from app.services.dossier_workflow import ensure_dossier, export_document, save_generation
+from app.services.dossier_workflow import (
+    DossierRequisError,
+    active_exigences_for_section,
+    ensure_outline_item,
+    export_document,
+    latest_section_markdown,
+    require_dossier,
+    save_generation,
+)
 from app.services.ollama_llm import ollama_generate_stream
 from app.workflow.agentic_pipeline import run_agentic_retrieval
 from app.workflow.graph import compiled_graph
 from app.workflow.nodes.generate_section import generate_section, section_to_markdown
+from app.workflow.nodes.route import is_extend_request as _is_extend_request
+from app.workflow.nodes.route import is_proposal_request as _is_proposal_request
 from app.workflow.nodes.route import route as route_node
 from app.workflow.nodes.retrieve import retrieve as retrieve_node
 from app.workflow.sections import DEFAULT_OUTLINE, archetype_for_key, pick_section
@@ -79,13 +89,13 @@ def _route_retrieve(query: str, tenant_id: UUID, history: list[dict] | None = No
     return state
 
 
-async def _iter_ollama_tokens(prompt: str) -> AsyncIterator[str]:
+async def _iter_ollama_tokens(prompt: str, *, num_ctx: int | None = None) -> AsyncIterator[str]:
     loop = asyncio.get_running_loop()
     queue: asyncio.Queue[tuple[str, str | None]] = asyncio.Queue()
 
     def worker() -> None:
         try:
-            for token in ollama_generate_stream(prompt):
+            for token in ollama_generate_stream(prompt, num_ctx=num_ctx):
                 loop.call_soon_threadsafe(queue.put_nowait, ("token", token))
             loop.call_soon_threadsafe(queue.put_nowait, ("done", None))
         except Exception as exc:
@@ -153,7 +163,7 @@ async def _persist_section_v2(
     seulement un pavé de texte — §1 étape 8/9."""
     if not can_write(user):
         return None
-    doss = await ensure_dossier(session, conv, user)
+    doss = await require_dossier(session, conv)
     model = get_settings().llm_model
     rendered = section_to_markdown(section)
     gen = await save_generation(
@@ -181,7 +191,7 @@ async def _persist_sections(
 ) -> UUID | None:
     if not can_write(user):
         return None
-    doss = await ensure_dossier(session, conv, user)
+    doss = await require_dossier(session, conv)
     citations = [
         {"chunk_id": h.get("chunk_id"), "page": h.get("page")}
         for h in (state.get("retrieved") or [])[:8]
@@ -270,7 +280,10 @@ async def process_message_sync(
                 else:
                     fmt = candidate if candidate != "markdown" else "md"
                 break
-        doss = await ensure_dossier(session, conv, user)
+        try:
+            doss = await require_dossier(session, conv)
+        except DossierRequisError as exc:
+            return str(exc), meta, None
         msgs = sorted(conv.messages or [], key=lambda m: m.created_at)
         notes = "\n\n".join(f"{m.role}: {m.content}" for m in msgs[-12:])
         rec, _ = await export_document(session, dossier=doss, user=user, fmt=fmt, transcript=notes)
@@ -282,6 +295,14 @@ async def process_message_sync(
         if not can_write(user):
             return (
                 "Rédaction réservée au rédacteur, manager ou admin.",
+                meta,
+                None,
+            )
+        if conv.dossier_id is None:
+            return (
+                "Impossible de rédiger : cette conversation n'est associée à aucun dossier. "
+                "Créez un dossier (Dossiers AO → Nouveau dossier), chargez son DAO, puis "
+                "démarrez la conversation depuis ce dossier.",
                 meta,
                 None,
             )
@@ -317,7 +338,13 @@ async def stream_message(
     history = _message_history(conv)
     user_msg = Message(conversation_id=conv.id, role="user", content=text)
     session.add(user_msg)
-    await session.flush()
+    # Commit (pas juste flush) : `run_agentic_retrieval` écrit les
+    # retrieval_traces (FK message_id) depuis SA PROPRE session par expert
+    # (asyncio.gather, chaque coroutine sa connexion — §async concurrency).
+    # Une ligne seulement flushée est invisible à cette autre connexion tant
+    # que la transaction courante n'est pas validée → violation de clé
+    # étrangère sinon.
+    await session.commit()
     yield _sse("user", {"content": text})
 
     try:
@@ -384,7 +411,7 @@ async def stream_message(
             yield _sse("error", {"message": "Export réservé au rédacteur, manager ou admin."})
             return
         try:
-            doss = await ensure_dossier(session, conv, user)
+            doss = await require_dossier(session, conv)
             msgs = sorted(conv.messages or [], key=lambda m: m.created_at)
             notes = "\n\n".join(f"{m.role}: {m.content}" for m in msgs[-12:])
             rec, _ = await export_document(session, dossier=doss, user=user, fmt=fmt, transcript=notes)
@@ -399,6 +426,8 @@ async def stream_message(
             await session.commit()
             yield _sse("export_ready", {"format": fmt, "dossier_id": str(doss.id), "version": rec.version})
             yield _sse("done", {"ok": True, "message": msg})
+        except DossierRequisError as exc:
+            yield _sse("error", {"message": str(exc)})
         except Exception as exc:
             log.exception("export stream échec")
             yield _sse("error", {"message": str(exc)})
@@ -407,6 +436,20 @@ async def stream_message(
     if intent == "run_section" and not can_write(user):
         msg = "Rédaction réservée au rédacteur, manager ou admin."
         session.add(Message(conversation_id=conv.id, role="assistant", content=msg, meta={"intent": intent}))
+        await session.commit()
+        yield _sse("error", {"message": msg})
+        return
+
+    if intent == "run_section" and conv.dossier_id is None:
+        # Garde précoce : évite de lancer récupération + génération LLM
+        # (coûteux) pour échouer seulement à la persistance faute de dossier.
+        msg = (
+            "Impossible de rédiger : cette conversation n'est associée à aucun dossier. "
+            "Créez un dossier (Dossiers AO → Nouveau dossier), chargez son DAO, puis "
+            "démarrez la conversation depuis ce dossier."
+        )
+        session.add(Message(conversation_id=conv.id, role="assistant", content=msg, meta={"intent": intent}))
+        conv.updated_at = datetime.now(UTC)
         await session.commit()
         yield _sse("error", {"message": msg})
         return
@@ -429,7 +472,10 @@ async def stream_message(
         )
         buf: list[str] = []
         try:
-            async for token in _iter_ollama_tokens(prompt):
+            # num_ctx=8192 : ce prompt embarque le contexte agrégé complet
+            # (déjà plafonné à 20000 caractères, aggregate.py) — même besoin
+            # que generate_section.py, voir ce fichier pour le détail du bug.
+            async for token in _iter_ollama_tokens(prompt, num_ctx=8192):
                 buf.append(token)
                 yield _sse("token", {"t": token, "section_key": "__chat__"})
         except Exception as exc:
@@ -460,14 +506,18 @@ async def stream_message(
     # token-par-token réel — la sortie doit être complète et validée avant
     # tout affichage (retry borné à 2 essais si invalide, §1 étape 9).
     # ------------------------------------------------------------------
+    # texte BRUT, pas query_clean : rewrite_query transforme délibérément le
+    # message en "phrase de recherche" et peut y perdre le mot-clé de thème
+    # ("moyens humains" → reformulé sans le mot "moyens") — bug réel observé,
+    # même cause que le garde-fou export/run_section de superviseur.py.
     generate_all = any(
-        w in query_clean.lower()
+        w in text.lower()
         for w in ("tout le mémoire", "tout le memoire", "toutes les sections", "le mémoire complet")
     )
     if generate_all:
         sections_to_run = [(k, t) for k, _lvl, t in DEFAULT_OUTLINE]
     else:
-        key, title, _all_flag = pick_section(query_clean)
+        key, title, _all_flag = pick_section(text)
         sections_to_run = [(key, title)]
 
     preview_parts: list[str] = []
@@ -490,12 +540,22 @@ async def stream_message(
             )
             section_aggregated = section_aggregated or aggregated
 
+        exigences: list[dict] = []
+        if conv.dossier_id:
+            item = await ensure_outline_item(session, conv.dossier_id, sk, stitle)
+            exigences = await active_exigences_for_section(session, item.id)
+        existing_markdown = None
+        if conv.dossier_id and _is_extend_request(text):
+            existing_markdown = await latest_section_markdown(session, conv.dossier_id, sk)
         section = await generate_section(
             section_key=sk,
             titre=stitle,
             archetype=archetype_for_key(sk),
             aggregated=section_aggregated,
             history=history,
+            exigences=exigences,
+            existing_markdown=existing_markdown,
+            allow_proposal=_is_proposal_request(text),
         )
         md = section_to_markdown(section)
         for piece in _chunk_text(md):

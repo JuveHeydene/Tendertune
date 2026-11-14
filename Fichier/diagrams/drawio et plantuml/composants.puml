@@ -1,0 +1,127 @@
+@startuml composants
+' =============================================================================
+' Diagramme de composants UML — vocabulaire générique (mémoire, méthodologie)
+' Notation : composants, ports, interfaces fournies (lollipop) et requises
+' (socket), connecteurs d'assemblage. Les deux chaînes de traitement partagent
+' la couche d'accès aux données et les services de modèles.
+' =============================================================================
+skinparam backgroundColor white
+skinparam defaultFontName "Latin Modern Roman"
+skinparam defaultFontColor black
+skinparam defaultFontSize 14
+skinparam shadowing false
+skinparam roundCorner 4
+skinparam ArrowColor #444444
+skinparam ArrowFontSize 12
+skinparam componentStyle uml2
+skinparam nodesep 12
+skinparam ranksep 22
+
+skinparam component {
+  BorderColor #555555
+  FontSize 13
+}
+skinparam interface {
+  BackgroundColor #FFFFFF
+  BorderColor #555555
+  FontSize 12
+}
+skinparam package {
+  BorderColor #777777
+  BackgroundColor #FBFBFB
+  FontSize 13
+  FontStyle bold
+}
+skinparam database {
+  BorderColor #555555
+  FontSize 12
+}
+
+title Diagramme de composants de la plateforme
+
+' ------------------------------------------------------------------ client
+component "Interface web" as UI #9DC3E6
+
+interface "Services métier" as I_METIER
+
+' -------------------------------------------------------------- passerelle
+component "Passerelle applicative" as GW #B4C7E7 {
+  portin "requêtes" as p_req
+  portout "flux d'événements" as p_evt
+}
+
+interface "Ingestion" as I_ING
+interface "Conversation" as I_CONV
+
+' --------------------------------------------------- horloge A (ingestion)
+package "Horloge A — chaîne d'ingestion (asynchrone)" as PA {
+  component "Ordonnanceur\nde travaux" as SCHED #C6E0B4
+  component "Analyseur\ndocumentaire" as PARSE #C6E0B4
+  component "Segmenteur\nhiérarchique" as CHUNK #C6E0B4
+  component "Indexeur" as INDEX #C6E0B4
+  component "Extracteur\nd'entités" as ENT #C6E0B4
+
+  SCHED -down-> PARSE
+  PARSE -down-> CHUNK
+  CHUNK -down-> INDEX
+  INDEX -down-> ENT
+}
+
+' ----------------------------------------------- horloge B (conversation)
+package "Horloge B — chaîne conversationnelle (synchrone)" as PB {
+  component "Superviseur" as SUP #D9B3D9
+  component "Agents de\nrécupération" as AGENTS #D9B3D9
+  component "Moteur de\nrecherche hybride" as SEARCH #FBE5B6
+  component "Agrégateur" as AGG #D9B3D9
+  component "Générateur\net validation" as GEN #D9B3D9
+  component "Composeur\nde livrables" as EXPORT #FBE5B6
+
+  interface "Recherche" as I_SEARCH
+
+  SUP -down-> AGENTS
+  AGENTS -down-> AGG
+  AGG -down-> GEN
+  GEN -down-> EXPORT
+}
+
+' ------------------------------------------------------ services partagés
+interface "Accès aux données" as I_DATA
+component "Couche d'accès\naux données" as DAO #E8DAEF
+
+interface "Modèles de langage\net de plongement" as I_MODEL
+component "Services de modèles" as MODELS #F4B6C2
+
+' -------------------------------------------------------------- entrepôts
+package "Entrepôts" as PP {
+  database "Base\nrelationnelle" as DB_REL #AED6F1
+  database "Index vectoriel\net lexical" as DB_VEC #AED6F1
+  database "Base graphe" as DB_GR #D7DBA0
+  database "Stockage objet" as DB_OBJ #FFD966
+}
+
+' ------------------------------------------------------------- assemblages
+UI -down-( I_METIER
+I_METIER -down- GW
+
+GW -down-( I_ING
+I_ING -down- SCHED
+GW -down-( I_CONV
+I_CONV -down- SUP
+
+AGENTS -up-( I_SEARCH
+I_SEARCH -up- SEARCH
+
+PA -down-( I_DATA
+PB -down-( I_DATA
+I_DATA -down- DAO
+
+PA -down-( I_MODEL
+PB -down-( I_MODEL
+I_MODEL -down- MODELS
+
+DAO -down-> DB_REL
+DAO -down-> DB_VEC
+DAO -down-> DB_GR
+DAO -down-> DB_OBJ
+
+@enduml

@@ -1,0 +1,108 @@
+@startuml deploiement
+' =============================================================================
+' Diagramme de déploiement UML : poste client, machine hôte, environnement
+' d'exécution conteneurisé, service de modèles accéléré par le GPU.
+'
+' Le réseau interne est matérialisé par un nœud dédié : chaque conteneur
+' applicatif s'y raccorde une fois, chaque entrepôt s'y raccorde une fois.
+' On évite ainsi le faisceau « chaque service vers chaque base » qui rendait
+' le tracé illisible.
+' =============================================================================
+skinparam backgroundColor white
+skinparam defaultFontName "Latin Modern Roman"
+skinparam defaultFontColor black
+skinparam defaultFontSize 14
+skinparam shadowing false
+skinparam roundCorner 4
+skinparam ArrowColor #444444
+skinparam ArrowFontSize 11
+skinparam nodesep 18
+skinparam ranksep 26
+
+skinparam node {
+  BorderColor #555555
+  BackgroundColor #FBFBFB
+  FontSize 13
+}
+skinparam artifact {
+  BorderColor #555555
+  FontSize 12
+}
+skinparam database {
+  BorderColor #555555
+  FontSize 12
+}
+skinparam queue {
+  BorderColor #555555
+  FontSize 12
+}
+skinparam note {
+  BorderColor #999999
+  BackgroundColor #FFFFE0
+  FontSize 11
+}
+
+title Diagramme de déploiement
+
+node "Poste client\n<size:11><i><<périphérique>></i></size>" as CLIENT #9DC3E6 {
+  artifact "Navigateur web" as BROWSER #B4C7E7
+}
+
+node "Machine hôte — Linux\n<size:11><i><<périphérique>> · processeur graphique NVIDIA</i></size>" as HOST {
+
+  node "Moteur de conteneurs (Docker Compose)\n<size:11><i><<environnement d'exécution>></i></size>" as DOCKER {
+
+    together {
+      node "api\n<size:11><i>FastAPI / Uvicorn · 8001</i></size>" as C_API #B4C7E7
+      node "frontend\n<size:11><i>serveur Vite · 5174</i></size>" as C_FR #9DC3E6
+      node "worker\n<size:11><i>ARQ · OCR</i></size>" as C_WK #C6E0B4
+    }
+
+    node "réseau interne Docker\n<size:11><i><<chemin de communication>></i></size>\n<size:11><i>résolution par nom de service</i></size>" as NET #EFEFEF
+
+    together {
+      database "postgres\n<size:11><i>pgvector · 5432</i></size>" as C_PG #AED6F1
+      database "qdrant\n<size:11><i>6333 / 6334</i></size>" as C_QD #AED6F1
+      database "neo4j\n<size:11><i>7687</i></size>" as C_NEO #D7DBA0
+      database "minio\n<size:11><i>9000 / 9001</i></size>" as C_MIN #FFD966
+      queue "redis\n<size:11><i>file ARQ · 6379</i></size>" as C_RED #FBE5B6
+    }
+  }
+
+  node "Service de modèles\n<size:11><i><<processus hôte>> · port 11434</i></size>" as OLLAMA #F4B6C2 {
+    artifact "**Ollama**\n<size:11><i>Granite 3.3 2B</i></size>\n<size:11><i>nomic-embed-text</i></size>" as A_OLL
+  }
+
+  node "Processeur graphique\n<size:11><i>RTX A5000 · 16 Go</i></size>" as GPU #E8DAEF
+}
+
+' --- accès depuis le poste client -------------------------------------------
+BROWSER --> C_FR : HTTPS 5174
+BROWSER --> C_API : HTTPS / SSE 8001
+
+' --- raccordement au réseau interne (une liaison par conteneur) -------------
+C_API --> NET
+C_WK --> NET
+C_FR --> NET
+
+' --- desserte des entrepôts (une liaison par service) -----------------------
+NET --> C_PG
+NET --> C_QD
+NET --> C_NEO
+NET --> C_MIN
+NET --> C_RED
+
+' --- service de modèles, hors conteneur -------------------------------------
+C_API ..> OLLAMA : HTTP 11434
+C_WK ..> OLLAMA : HTTP 11434
+
+OLLAMA --> GPU : CUDA
+C_WK ..> GPU : passerelle de conteneurs
+
+note right of NET
+  Les volumes nommés portent les données des bases
+  et du stockage objet : ils survivent au redémarrage
+  des conteneurs.
+end note
+
+@enduml

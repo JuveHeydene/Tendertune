@@ -1,0 +1,66 @@
+<mxfile host="65bd71144e">
+    <diagram name="Agent — cycle perception-raisonnement-action" id="d1">
+        <mxGraphModel dx="1208" dy="795" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1300" pageHeight="1100" background="#FFFFFF" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="boundary" value="AGENT" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#8891A6;dashed=1;verticalAlign=top;align=left;spacingLeft=24;spacingTop=16;fontStyle=1;fontSize=22;fontColor=#33465C;" parent="1" vertex="1">
+                    <mxGeometry x="120" y="25" width="1060" height="970" as="geometry"/>
+                </mxCell>
+                <mxCell id="n100" value="ENVIRONNEMENT" style="shape=cloud;fillColor=#E4E7ED;strokeColor=#4A5A72;fontColor=#26344A;fontSize=24;fontStyle=1;html=1;whiteSpace=wrap;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="490" y="430" width="320" height="220" as="geometry"/>
+                </mxCell>
+                <mxCell id="n101" value="" style="shape=image;image=data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%2060%22%3E%3Cpath%20d%3D%22M2%2030%20Q50%202%2098%2030%20Q50%2058%202%2030%20Z%22%20fill%3D%22%23D4EAE7%22%20stroke%3D%22%2321756B%22%20stroke-width%3D%224%22%2F%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2230%22%20r%3D%2214%22%20fill%3D%22%2321756B%22%2F%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2230%22%20r%3D%225%22%20fill%3D%22%23D4EAE7%22%2F%3E%3C%2Fsvg%3E;html=1;whiteSpace=wrap;imageAspect=0;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="460" y="60" width="240" height="150" as="geometry"/>
+                </mxCell>
+                <mxCell id="n102" value="Capteurs (perception)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=none;fontColor=#123E38;fontStyle=1;fontSize=22;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="330" y="215" width="500" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="n103" value="" style="shape=image;image=data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Cpolygon%20points%3D%2296.0%2C50.0%2084.2%2C61.1%2087.2%2C77.0%2071.2%2C79.1%2064.2%2C93.7%2050.0%2C86.0%2035.8%2C93.7%2028.8%2C79.1%2012.8%2C77.0%2015.8%2C61.1%204.0%2C50.0%2015.8%2C38.9%2012.8%2C23.0%2028.8%2C20.9%2035.8%2C6.3%2050.0%2C14.0%2064.2%2C6.3%2071.2%2C20.9%2087.2%2C23.0%2084.2%2C38.9%22%20fill%3D%22%23DCE3F0%22%20stroke%3D%22%231F2F55%22%20stroke-width%3D%223%22%20stroke-linejoin%3D%22round%22%2F%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2216%22%20fill%3D%22%231F2F55%22%2F%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2210%22%20fill%3D%22%23DCE3F0%22%2F%3E%3C%2Fsvg%3E;html=1;whiteSpace=wrap;imageAspect=0;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="980" y="480" width="220" height="220" as="geometry"/>
+                </mxCell>
+                <mxCell id="n104" value="Raisonnement et prise de décision" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=none;fontColor=#14203D;fontStyle=1;fontSize=22;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="850" y="720" width="480" height="65" as="geometry"/>
+                </mxCell>
+                <mxCell id="n105" value="" style="shape=image;image=data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2060%20100%22%3E%3Cpolygon%20points%3D%2235%2C2%208%2C55%2027%2C55%2020%2C98%2055%2C42%2034%2C42%22%20fill%3D%22%23F1DCCF%22%20stroke%3D%22%23B25B2E%22%20stroke-width%3D%223%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E;html=1;whiteSpace=wrap;imageAspect=0;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="130" y="480" width="209" height="217" as="geometry"/>
+                </mxCell>
+                <mxCell id="n106" value="Effecteurs (action)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=none;fontColor=#5C2E14;fontStyle=1;fontSize=22;align=center;" parent="1" vertex="1">
+                    <mxGeometry y="720" width="460" height="65" as="geometry"/>
+                </mxCell>
+                <mxCell id="n107" value="perçoit" style="endArrow=block;endFill=1;endSize=10;html=1;strokeWidth=3;strokeColor=#21756B;fontColor=#21756B;fontStyle=1;fontSize=19;curved=1;rounded=0;" parent="1" source="n100" target="n101" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="500" y="300"/>
+                            <mxPoint x="560" y="200"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="n108" value="interprète" style="endArrow=block;endFill=1;endSize=10;html=1;strokeWidth=3;strokeColor=#1F2F55;fontColor=#1F2F55;fontStyle=1;fontSize=19;curved=1;rounded=0;" parent="1" source="n101" target="n103" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="780" y="160"/>
+                            <mxPoint x="1050" y="320"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="n109" value="décide" style="endArrow=block;endFill=1;endSize=10;html=1;strokeWidth=3;strokeColor=#B25B2E;fontColor=#B25B2E;fontStyle=1;fontSize=19;curved=1;rounded=0;" parent="1" source="n103" target="n105" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1040" y="940"/>
+                            <mxPoint x="230" y="940"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="n110" value="agit sur" style="endArrow=block;endFill=1;endSize=10;html=1;strokeWidth=3;strokeColor=#4A5A72;fontColor=#4A5A72;fontStyle=1;fontSize=19;curved=1;rounded=0;" parent="1" source="n105" target="n100" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="270" y="550"/>
+                            <mxPoint x="460" y="500"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

@@ -126,6 +126,11 @@ CREATE TABLE IF NOT EXISTS documents (
     -- false = RAG ok possible sans graphe ; true = extract_graph déjà fait pour ce fichier
     graph_extracted BOOLEAN NOT NULL DEFAULT FALSE,
     ingest_error    TEXT,
+    -- Horodatage début/fin par phase (parse, chunk, classify, embed, index, graph) :
+    -- {"parse": {"started_at": "...", "finished_at": "..."}, ...}
+    pipeline_stages JSONB NOT NULL DEFAULT '{}'::jsonb,
+    -- Reprise OCR page par page après interruption : {"resume_page": N, "pages": {...}}
+    ocr_progress    JSONB NOT NULL DEFAULT '{}'::jsonb,
     filename        VARCHAR(255) NOT NULL,
     size_bytes      BIGINT,
     mime_type       VARCHAR(128),
@@ -155,6 +160,10 @@ CREATE TABLE IF NOT EXISTS dossiers (
                           'ready_export', 'exported', 'archived'
                       )),
     current_version   INTEGER NOT NULL DEFAULT 1,
+    -- V2.2 — suivi du job "classifier les exigences par section" (§ liaison
+    -- exigences/sections, app/workflow/extract_structure.py).
+    classification_status VARCHAR(32),
+    classification_error  TEXT,
     created_by        UUID NOT NULL REFERENCES users (id) ON DELETE RESTRICT,
     created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -260,6 +269,24 @@ CREATE INDEX IF NOT EXISTS idx_outline_dossier ON outline_items (dossier_id);
 CREATE INDEX IF NOT EXISTS idx_outline_status ON outline_items (dossier_id, status);
 CREATE INDEX IF NOT EXISTS idx_outline_order ON outline_items (dossier_id, sort_order);
 
+-- V2.2 — liaison N:N exigence <-> section (§ migration 004 pour le détail
+-- du raisonnement origine/statut).
+CREATE TABLE IF NOT EXISTS exigence_sections (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    exigence_id     UUID NOT NULL REFERENCES exigences (id) ON DELETE CASCADE,
+    outline_item_id UUID NOT NULL REFERENCES outline_items (id) ON DELETE CASCADE,
+    origine         VARCHAR(16) NOT NULL DEFAULT 'humain'
+                    CHECK (origine IN ('llm', 'humain')),
+    statut          VARCHAR(16) NOT NULL DEFAULT 'confirmee'
+                    CHECK (statut IN ('proposee', 'confirmee', 'exclue')),
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT unique_exigence_section UNIQUE (exigence_id, outline_item_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_exigence_sections_outline ON exigence_sections (outline_item_id, statut);
+CREATE INDEX IF NOT EXISTS idx_exigence_sections_exigence ON exigence_sections (exigence_id, statut);
+
 CREATE TABLE IF NOT EXISTS generations (
     id                        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     dossier_id                UUID NOT NULL REFERENCES dossiers (id) ON DELETE CASCADE,
@@ -364,11 +391,16 @@ CREATE TABLE IF NOT EXISTS retrieval_traces (
     grade_method         VARCHAR(16) CHECK (grade_method IS NULL OR grade_method IN ('seuil', 'llm_juge')),
     chunks_retournes     JSONB NOT NULL DEFAULT '[]'::jsonb,
     abstention           BOOLEAN NOT NULL DEFAULT FALSE,
+    -- V2.2 — clé de corrélation vers generations.context_snapshot (§ migration
+    -- 005) : generation_id ne peut pas servir de FK ici (retrieval commitée
+    -- avant que la Generation existe), donc pas de contrainte sur cette colonne.
+    trace_batch_id       UUID,
     created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_traces_message ON retrieval_traces (message_id);
 CREATE INDEX IF NOT EXISTS idx_traces_tenant_expert_grade ON retrieval_traces (tenant_id, expert, grade);
+CREATE INDEX IF NOT EXISTS idx_retrieval_traces_batch ON retrieval_traces (trace_batch_id);
 
 -- V2 — checklist du dossier administratif (§5.3)
 CREATE TABLE IF NOT EXISTS dossier_pieces (
@@ -379,7 +411,9 @@ CREATE TABLE IF NOT EXISTS dossier_pieces (
     document_id   UUID REFERENCES documents (id) ON DELETE SET NULL,
     statut        VARCHAR(32) NOT NULL DEFAULT 'manquant'
                   CHECK (statut IN ('manquant', 'trouve_patrimoine', 'a_uploader', 'fourni')),
-    source        VARCHAR(16) NOT NULL DEFAULT 'standard' CHECK (source IN ('rc', 'standard')),
+    -- 'manuel' = rubrique ajoutée à la main (pièce dynamique non prévue par
+    -- le RC ni la liste standard) — voir migration 006.
+    source        VARCHAR(16) NOT NULL DEFAULT 'standard' CHECK (source IN ('rc', 'standard', 'manuel')),
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

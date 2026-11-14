@@ -55,7 +55,9 @@ def grade_context(query: str, chunks: list[dict]) -> tuple[Grade, str]:
     # score moyen sans répondre à la question précise) — 1 seul appel LLM ici.
     try:
         context = "\n\n".join(f"[{i}] {c.get('text', '')[:1500]}" for i, c in enumerate(chunks[:5], 1))
-        body = ollama_generate_json(_JUGE_PROMPT.format(query=query, context=context), timeout=60)
+        # Déjà borné (5 chunks x 1500 car. max) mais explicite plutôt
+        # qu'implicite — même principe que partout ailleurs dans ce fichier.
+        body = ollama_generate_json(_JUGE_PROMPT.format(query=query, context=context), timeout=60, num_ctx=4096)
         value = str(body.get("grade", "")).strip().lower()
         if value in ("correct", "ambigu", "incorrect"):
             return Grade(value), "llm_juge"

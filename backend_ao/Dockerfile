@@ -10,8 +10,20 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Pas d'apt-get : évite deb.debian.org (DNS Docker souvent cassé).
 # Attente des services = scripts/wait_for.py (stdlib).
+# apt-get nécessaire pour WeasyPrint (libs de rendu, pas de wheel possible) —
+# fonctionne car le build tourne en network: host (voir docker-compose.yml).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libpango-1.0-0 \
+        libpangocairo-1.0-0 \
+        libpangoft2-1.0-0 \
+        libcairo2 \
+        libgdk-pixbuf-2.0-0 \
+        libffi8 \
+        shared-mime-info \
+        fonts-dejavu-core \
+        fonts-liberation \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 

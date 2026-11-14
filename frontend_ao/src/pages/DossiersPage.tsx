@@ -1,17 +1,50 @@
-import { useEffect, useMemo, useState } from 'react'
+import { type FormEvent, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { fetchDossiers, downloadDossierExport, type Dossier, type ExportFormat } from '../api/client'
+import { fetchDossiers, downloadDossierExport, dossierApi, type Dossier, type ExportFormat } from '../api/client'
 
 export function DossiersPage() {
   const [rows, setRows] = useState<Dossier[]>([])
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [fmt, setFmt] = useState<ExportFormat>('docx')
+  const [showCreate, setShowCreate] = useState(false)
+  const [createBusy, setCreateBusy] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
   const navigate = useNavigate()
 
+  function reload() {
+    return fetchDossiers().then(setRows).catch((e: Error) => setError(e.message))
+  }
+
   useEffect(() => {
-    fetchDossiers().then(setRows).catch((e: Error) => setError(e.message))
+    reload()
   }, [])
+
+  async function onCreate(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const form = new FormData(e.currentTarget)
+    const project_name = String(form.get('project_name') || '').trim()
+    const client_name = String(form.get('client_name') || '').trim()
+    const dao_reference = String(form.get('dao_reference') || '').trim()
+    if (!project_name) {
+      setCreateError('Le nom du projet est requis')
+      return
+    }
+    setCreateBusy(true)
+    setCreateError(null)
+    try {
+      const created = await dossierApi.create({
+        project_name,
+        client_name: client_name || undefined,
+        dao_reference: dao_reference || undefined,
+      })
+      navigate(`/app/dossiers/${created.id}`)
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : 'Création impossible')
+    } finally {
+      setCreateBusy(false)
+    }
+  }
 
   // §3.1 — groupement par client (l'entité maître d'ouvrage pour qui le
   // DAO a été émis), pas par tenant (déjà isolé par l'auth).
@@ -29,14 +62,35 @@ export function DossiersPage() {
     <div className="dash">
       <header className="dash-head">
         <p className="eyebrow">Appels d’offres</p>
-        <h1>Dossiers</h1>
+        <div className="dash-head-row">
+          <h1>Dossiers</h1>
+          <button type="button" className="btn-primary" onClick={() => setShowCreate((v) => !v)}>
+            {showCreate ? 'Annuler' : '+ Nouveau dossier'}
+          </button>
+        </div>
         <p className="lede">
-          Un dossier se construit en conversation (sections du mémoire) puis s’exporte en DOCX.
+          Un dossier existe avant toute conversation : créez-le, chargez son DAO, analysez-le (exigences +
+          plan), puis rédigez depuis une conversation dédiée à ce dossier.
         </p>
       </header>
+      {showCreate ? (
+        <form className="card-form" onSubmit={onCreate}>
+          <input type="text" name="project_name" required placeholder="Nom du projet *" />
+          <input type="text" name="client_name" placeholder="Client / maître d’ouvrage" />
+          <input type="text" name="dao_reference" placeholder="Référence DAO (ex. AO-2026-042)" />
+          <button type="submit" className="btn-primary" disabled={createBusy}>
+            {createBusy ? 'Création…' : 'Créer le dossier'}
+          </button>
+          {createError ? <p className="form-error">{createError}</p> : null}
+          <p className="muted docs-upload-hint">
+            Après création, vous serez redirigé vers le dossier pour y charger le DAO (onglet Documents) et
+            lancer l’analyse — les exigences et le plan viennent de cette analyse, pas d’un modèle générique.
+          </p>
+        </form>
+      ) : null}
       {error ? <p className="form-error">{error}</p> : null}
       {rows.length === 0 ? (
-        <p className="muted">Aucun dossier. Ouvrez une conversation et rédigez une section du mémoire.</p>
+        <p className="muted">Aucun dossier pour l’instant. Créez-en un pour commencer.</p>
       ) : (
         groups.map(([client, dossiers]) => (
           <section key={client} className="dossier-group">

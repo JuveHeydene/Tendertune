@@ -43,6 +43,36 @@ export type ManagedUser = AuthUser & {
   last_login_at: string | null
 }
 
+export type AuditLogEntry = {
+  id: string
+  tenant_id: string
+  user_id: string | null
+  user_email: string | null
+  action_type: string
+  resource_type: string | null
+  resource_id: string | null
+  details: Record<string, unknown>
+  ip_address: string | null
+  user_agent: string | null
+  success: boolean
+  error_message: string | null
+  created_at: string
+}
+
+export type RetrievalTraceEntry = {
+  sous_question_index: number
+  sous_question_texte: string | null
+  expert: string
+  tentative: number
+  query_utilisee: string
+  filtres: Record<string, unknown>
+  grade: string | null
+  grade_method: string | null
+  chunks_retournes: { chunk_id?: string; score?: number }[]
+  abstention: boolean
+  created_at: string
+}
+
 export type UserSession = {
   id: string
   user_id: string
@@ -79,6 +109,12 @@ export type DocItem = {
   created_at: string | null
   updated_at: string | null
   duplicate?: boolean
+  // { parse: { started_at, finished_at, error? }, chunk: {...}, classify: {...},
+  //   embed: {...}, index: {...}, graph: {...} } — horodatage par phase du
+  // pipeline d'ingestion, affiché dans le détail du document.
+  pipeline_stages?: Record<string, { started_at?: string; finished_at?: string; error?: string }>
+  // Nombre de pages déjà OCRisées et persistées (reprise après interruption).
+  ocr_pages_done?: number
 }
 
 export type Conversation = {
@@ -120,11 +156,29 @@ export type Dossier = {
   status: string
   deadline: string | null
   current_version?: number | null
+  has_dao: boolean
+  dao_document_id: string | null
+  dao_filename: string | null
+  dao_status: string | null
+  dao_ingest_error: string | null
   exigences_total: number
   exigences_couvertes: number
   exigences_eliminatoires_non_couvertes: number
   sections_total: number
   sections_approuvees: number
+  classification_status: string | null
+  classification_error: string | null
+}
+
+export type SectionExigenceLink = {
+  exigence_id: string
+  libelle: string
+  type: string
+  obligatoire: boolean
+  statut_couverture: string
+  origine: 'llm' | 'humain'
+  statut_lien: 'proposee' | 'confirmee' | 'exclue'
+  preuves_chunks: string[]
 }
 
 export type Exigence = {
@@ -136,6 +190,15 @@ export type Exigence = {
   reference_dao: string | null
   page_source: number | null
   preuves_chunks: string[]
+}
+
+export type ExigencePreuve = {
+  chunk_id: string
+  document_id: string | null
+  document_filename: string | null
+  page: number | null
+  heading_path: string | null
+  text: string
 }
 
 export type OutlineItemApi = {
@@ -173,7 +236,7 @@ export type DossierPieceApi = {
   obligatoire: boolean
   statut: 'manquant' | 'trouve_patrimoine' | 'a_uploader' | 'fourni'
   document_id: string | null
-  source: 'rc' | 'standard'
+  source: 'rc' | 'standard' | 'manuel'
 }
 
 const TOKEN_KEY = 'btp_ao_token'
@@ -185,6 +248,14 @@ export function getToken(): string | null {
 export function setToken(token: string | null) {
   if (token) localStorage.setItem(TOKEN_KEY, token)
   else localStorage.removeItem(TOKEN_KEY)
+}
+
+export class ApiError extends Error {
+  status: number
+  constructor(message: string, status: number) {
+    super(message)
+    this.status = status
+  }
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -208,7 +279,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     } else if (ctype.includes('text/html')) {
       detail = `Réponse HTML (${res.status}) pour ${path} — proxy Vite / API manquant ?`
     }
-    throw new Error(detail)
+    throw new ApiError(detail, res.status)
   }
   if (res.status === 204) return undefined as T
   if (!ctype.includes('application/json')) {
@@ -254,6 +325,14 @@ export const adminApi = {
     request<{ ok: boolean; revoked: number }>(`/admin/users/${userId}/revoke-sessions`, {
       method: 'POST',
     }),
+  auditLogs: (filters?: { action_type?: string; resource_type?: string; success?: boolean }) => {
+    const params = new URLSearchParams()
+    if (filters?.action_type) params.set('action_type', filters.action_type)
+    if (filters?.resource_type) params.set('resource_type', filters.resource_type)
+    if (filters?.success !== undefined) params.set('success', String(filters.success))
+    const qs = params.toString()
+    return request<AuditLogEntry[]>(`/admin/audit-logs${qs ? `?${qs}` : ''}`)
+  },
 }
 
 export const docsApi = {
@@ -265,11 +344,18 @@ export const docsApi = {
     fd.append('file', file)
     fd.append('doc_role', docRole)
     if (docType) fd.append('doc_type', docType)
-    if (docRole === 'annexe' && dossierId) fd.append('dossier_id', dossierId)
+    if ((docRole === 'annexe' || docRole === 'dao_courant' || docRole === 'dao_archive') && dossierId) {
+      fd.append('dossier_id', dossierId)
+    }
     return request<DocItem>('/documents', { method: 'POST', body: fd })
   },
   promote: (id: string) => request<DocItem>(`/documents/${id}/promouvoir`, { method: 'POST' }),
   remove: (id: string) => request<void>(`/documents/${id}`, { method: 'DELETE' }),
+  // Relance l'ingestion (reprend depuis la dernière page OCR connue, purge
+  // les vecteurs Qdrant avant réindexation — aucun résidu dupliqué).
+  relancerIngestion: (id: string) => request<DocItem>(`/documents/${id}/relancer-ingestion`, { method: 'POST' }),
+  // Relance uniquement l'extraction du graphe (document déjà 'ready').
+  relancerGraphe: (id: string) => request<DocItem>(`/documents/${id}/relancer-graphe`, { method: 'POST' }),
 }
 
 export const exportsApi = {
@@ -292,10 +378,10 @@ export const exportsApi = {
 
 export const convApi = {
   list: () => request<Conversation[]>('/conversations'),
-  create: (title?: string) =>
+  create: (title?: string, dossierId?: string | null) =>
     request<Conversation>('/conversations', {
       method: 'POST',
-      body: JSON.stringify({ title: title || null }),
+      body: JSON.stringify({ title: title || null, dossier_id: dossierId || null }),
     }),
   get: (id: string) => request<Conversation>(`/conversations/${id}`),
   rename: (id: string, title: string) =>
@@ -304,6 +390,8 @@ export const convApi = {
       body: JSON.stringify({ title }),
     }),
   remove: (id: string) => request<void>(`/conversations/${id}`, { method: 'DELETE' }),
+  messageTraces: (conversationId: string, messageId: string) =>
+    request<RetrievalTraceEntry[]>(`/conversations/${conversationId}/messages/${messageId}/traces`),
   uploadDocument: (id: string, file: File, role: 'annexe' | 'patrimoine' = 'annexe') => {
     const fd = new FormData()
     fd.append('file', file)
@@ -409,18 +497,71 @@ export async function downloadDossierExport(dossierId: string, format: ExportFor
 /** @deprecated use downloadDossierExport */
 export const downloadDossierDocx = (id: string) => downloadDossierExport(id, 'docx')
 
+export async function downloadDossierPieces(dossierId: string, projectName?: string) {
+  const token = getToken()
+  const headers = new Headers()
+  if (token) headers.set('Authorization', `Bearer ${token}`)
+  const res = await fetch(`/dossiers/${dossierId}/pieces/export`, { headers })
+  if (!res.ok) {
+    let detail = res.statusText
+    try {
+      const body = await res.json()
+      if (typeof body.detail === 'string') detail = body.detail
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail)
+  }
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `dossier_administratif_${(projectName || dossierId.slice(0, 8)).replace(/\s+/g, '_')}.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export const dossierApi = {
+  list: () => request<Dossier[]>('/dossiers'),
+  create: (body: { project_name: string; client_name?: string; dao_reference?: string; deadline?: string }) =>
+    request<Dossier>('/dossiers', { method: 'POST', body: JSON.stringify(body) }),
+  update: (
+    id: string,
+    body: Partial<{ project_name: string; client_name: string; dao_reference: string; deadline: string }>,
+  ) => request<Dossier>(`/dossiers/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   get: (id: string) => request<Dossier>(`/dossiers/${id}`),
   analyser: (id: string) => request<{ dossier_id: string; status: string; job_id: string | null }>(
     `/dossiers/${id}/analyser`,
     { method: 'POST' },
   ),
   exigences: (id: string) => request<Exigence[]>(`/dossiers/${id}/exigences`),
+  preuvesExigence: (dossierId: string, exigenceId: string) =>
+    request<ExigencePreuve[]>(`/dossiers/${dossierId}/exigences/${exigenceId}/preuves`),
   relancerRechercheExigence: (dossierId: string, exigenceId: string) =>
     request<{ exigence_id: string; status: string }>(
       `/dossiers/${dossierId}/exigences/${exigenceId}/recherche`,
       { method: 'POST' },
     ),
+  classifierSections: (dossierId: string) =>
+    request<{ dossier_id: string; status: string; job_id: string | null }>(
+      `/dossiers/${dossierId}/exigences/classifier-sections`,
+      { method: 'POST' },
+    ),
+  sectionExigences: (dossierId: string, sectionKey: string) =>
+    request<SectionExigenceLink[]>(`/dossiers/${dossierId}/sections/${sectionKey}/exigences`),
+  linkSectionExigence: (dossierId: string, sectionKey: string, exigenceId: string) =>
+    request<SectionExigenceLink>(`/dossiers/${dossierId}/sections/${sectionKey}/exigences/${exigenceId}`, {
+      method: 'POST',
+    }),
+  confirmSectionExigence: (dossierId: string, sectionKey: string, exigenceId: string) =>
+    request<SectionExigenceLink>(
+      `/dossiers/${dossierId}/sections/${sectionKey}/exigences/${exigenceId}/confirmer`,
+      { method: 'POST' },
+    ),
+  unlinkSectionExigence: (dossierId: string, sectionKey: string, exigenceId: string) =>
+    request<void>(`/dossiers/${dossierId}/sections/${sectionKey}/exigences/${exigenceId}`, {
+      method: 'DELETE',
+    }),
   outline: (id: string) => request<OutlineItemApi[]>(`/dossiers/${id}/outline`),
   getSection: (dossierId: string, sectionKey: string) =>
     request<SectionDetail>(`/dossiers/${dossierId}/sections/${sectionKey}`),
@@ -437,10 +578,27 @@ export const dossierApi = {
     ),
   historique: (dossierId: string, sectionKey: string) =>
     request<ReviewApi[]>(`/dossiers/${dossierId}/sections/${sectionKey}/historique`),
+  sectionTraces: (dossierId: string, sectionKey: string) =>
+    request<RetrievalTraceEntry[]>(`/dossiers/${dossierId}/sections/${sectionKey}/traces`),
   pieces: (id: string) => request<DossierPieceApi[]>(`/dossiers/${id}/pieces`),
   choisirPiece: (dossierId: string, pieceId: string, documentId: string) =>
     request<{ piece_id: string; statut: string }>(`/dossiers/${dossierId}/pieces/${pieceId}/choisir`, {
       method: 'POST',
       body: JSON.stringify({ document_id: documentId }),
     }),
+  creerPiece: (dossierId: string, libelle: string, obligatoire = true) =>
+    request<DossierPieceApi>(`/dossiers/${dossierId}/pieces`, {
+      method: 'POST',
+      body: JSON.stringify({ libelle, obligatoire }),
+    }),
+  retirerPiece: (dossierId: string, pieceId: string) =>
+    request<void>(`/dossiers/${dossierId}/pieces/${pieceId}`, { method: 'DELETE' }),
+  uploadPiece: (dossierId: string, pieceId: string, file: File) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    return request<DossierPieceApi>(`/dossiers/${dossierId}/pieces/${pieceId}/upload`, {
+      method: 'POST',
+      body: fd,
+    })
+  },
 }

@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import type { Role } from '../api/client'
+import { Icon, type IconKey } from '../components/Icons'
 
 const ROLE_LABEL: Record<Role, string> = {
   admin: 'Administration',
@@ -9,37 +10,43 @@ const ROLE_LABEL: Record<Role, string> = {
   consultant: 'Revue',
 }
 
-const NAV: Record<Role, { to: string; label: string; end?: boolean }[]> = {
+type NavItem = { to: string; label: string; icon: IconKey; end?: boolean }
+
+const NAV: Record<Role, NavItem[]> = {
   admin: [
-    { to: '/app/admin', label: 'Tableau de bord', end: true },
-    { to: '/app/admin/users', label: 'Utilisateurs' },
-    { to: '/app/admin/tenants', label: 'Tenants' },
-    { to: '/app/admin/sessions', label: 'Sessions' },
-    // Manquait — trouvé en vérifiant la navigation réelle : sans ce lien,
-    // aucune page dossier (liste ou détail 5 onglets) n'était joignable
-    // pour ce rôle, seulement par URL directe.
-    { to: '/app/dossiers', label: 'Dossiers AO' },
-    { to: '/app/documents', label: 'Documents' },
-    { to: '/app/conversations', label: 'Conversations' },
+    { to: '/app/admin', label: 'Tableau de bord', icon: 'dashboard', end: true },
+    { to: '/app/admin/users', label: 'Utilisateurs', icon: 'users' },
+    { to: '/app/admin/tenants', label: 'Tenants', icon: 'tenants' },
+    { to: '/app/admin/sessions', label: 'Sessions', icon: 'sessions' },
+    { to: '/app/admin/audit', label: "Journal d'audit", icon: 'audit' },
+    { to: '/app/dossiers', label: 'Dossiers AO', icon: 'dossiers' },
+    { to: '/app/documents', label: 'Documents', icon: 'documents' },
+    { to: '/app/conversations', label: 'Conversations', icon: 'conversations' },
   ],
   manager: [
-    { to: '/app/manager', label: 'Portefeuille', end: true },
-    { to: '/app/dossiers', label: 'Dossiers AO' },
-    { to: '/app/documents', label: 'Documents' },
-    { to: '/app/conversations', label: 'Conversations' },
+    { to: '/app/manager', label: 'Portefeuille', icon: 'dashboard', end: true },
+    { to: '/app/dossiers', label: 'Dossiers AO', icon: 'dossiers' },
+    { to: '/app/documents', label: 'Documents', icon: 'documents' },
+    { to: '/app/conversations', label: 'Conversations', icon: 'conversations' },
   ],
   redacteur: [
-    { to: '/app/redacteur', label: 'Atelier', end: true },
-    { to: '/app/dossiers', label: 'Dossiers' },
-    { to: '/app/documents', label: 'Patrimoine' },
-    { to: '/app/conversations', label: 'Conversations' },
+    { to: '/app/redacteur', label: 'Atelier', icon: 'dashboard', end: true },
+    { to: '/app/dossiers', label: 'Dossiers', icon: 'dossiers' },
+    { to: '/app/documents', label: 'Patrimoine', icon: 'documents' },
+    { to: '/app/conversations', label: 'Conversations', icon: 'conversations' },
   ],
   consultant: [
-    { to: '/app/consultant', label: 'Revue', end: true },
-    { to: '/app/dossiers', label: 'Dossiers' },
-    { to: '/app/documents', label: 'Bibliothèque' },
-    { to: '/app/conversations', label: 'Conversations' },
+    { to: '/app/consultant', label: 'Revue', icon: 'dashboard', end: true },
+    { to: '/app/dossiers', label: 'Dossiers', icon: 'dossiers' },
+    { to: '/app/documents', label: 'Bibliothèque', icon: 'documents' },
+    { to: '/app/conversations', label: 'Conversations', icon: 'conversations' },
   ],
+}
+
+function initials(first?: string | null, last?: string | null): string {
+  const a = (first || '').trim()[0] || ''
+  const b = (last || '').trim()[0] || ''
+  return (a + b).toUpperCase() || '?'
 }
 
 export function AppShell() {
@@ -57,23 +64,36 @@ export function AppShell() {
     <div className="shell">
       <aside className="sidebar">
         <div className="logo">
-          <span>CHANTIER</span>
-          <strong>Offres</strong>
+          <span className="logo-mark" aria-hidden="true">CO</span>
+          <span className="logo-text">
+            <span className="logo-kicker">CHANTIER</span>
+            <strong>Offres</strong>
+          </span>
         </div>
-        <p className="tenant">{user.tenant_name}</p>
+        <p className="tenant" title={user.tenant_name}>
+          {user.tenant_name}
+        </p>
         <nav>
           {links.map((l) => (
-            <NavLink key={l.to + l.label} to={l.to} end={l.end}>
-              {l.label}
+            <NavLink key={l.to + l.label} to={l.to} end={l.end} title={l.label}>
+              <Icon name={l.icon} className="nav-icon" />
+              <span className="nav-label">{l.label}</span>
             </NavLink>
           ))}
         </nav>
         <div className="sidebar-foot">
-          <p className={`badge role-${user.role}`}>{ROLE_LABEL[user.role]}</p>
-          <p className="who">
-            {user.first_name} {user.last_name}
-          </p>
-          <button type="button" className="btn-ghost" onClick={onLogout}>
+          <div className="who-card">
+            <span className="avatar" aria-hidden="true">
+              {initials(user.first_name, user.last_name)}
+            </span>
+            <span className="who-info">
+              <span className="who-name">
+                {user.first_name} {user.last_name}
+              </span>
+              <span className={`badge role-${user.role}`}>{ROLE_LABEL[user.role]}</span>
+            </span>
+          </div>
+          <button type="button" className="btn-ghost logout-btn" onClick={onLogout}>
             Quitter le chantier
           </button>
         </div>

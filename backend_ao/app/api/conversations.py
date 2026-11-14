@@ -14,9 +14,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.auth import get_current_user
-from app.models.sql import Conversation, Message, User
+from app.models.sql import Conversation, Dossier, Message, RetrievalTrace, User
 from app.services.chat_pipeline import can_write, process_message_sync, stream_message
-from app.services.dossier_workflow import EXPORT_FORMATS, ensure_dossier, export_document, latest_sections
+from app.services.dossier_workflow import (
+    EXPORT_FORMATS,
+    DossierRequisError,
+    export_document,
+    latest_sections,
+    require_dossier,
+)
 from app.services.document_upload import store_document
 from app.services.purge_conversation import purge_conversation
 from app.services.db_client import get_session
@@ -222,6 +228,10 @@ async def create_conversation(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
+    if body.dossier_id is not None:
+        doss = await session.get(Dossier, body.dossier_id)
+        if doss is None or doss.tenant_id != user.tenant_id:
+            raise HTTPException(status_code=404, detail="Dossier introuvable")
     conv = Conversation(
         tenant_id=user.tenant_id,
         user_id=user.id,
@@ -255,6 +265,53 @@ async def _load_conv(session: AsyncSession, conversation_id: UUID, user: User) -
     if user.role != "admin" and conv.user_id != user.id:
         raise HTTPException(status_code=403, detail="Accès refusé")
     return conv
+
+
+class RetrievalTraceOut(BaseModel):
+    sous_question_index: int
+    sous_question_texte: str | None
+    expert: str
+    tentative: int
+    query_utilisee: str
+    filtres: dict
+    grade: str | None
+    grade_method: str | None
+    chunks_retournes: list
+    abstention: bool
+    created_at: datetime
+
+
+@router.get("/{conversation_id}/messages/{message_id}/traces", response_model=list[RetrievalTraceOut])
+async def get_message_traces(
+    conversation_id: UUID,
+    message_id: UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Explique POURQUOI l'assistant a répondu ainsi à ce message : chaque
+    tentative de recherche CRAG (requête utilisée, filtres, note de
+    grading, chunks retournés, abstention). `retrieval_traces` existait
+    depuis le début (écrite dans app/rag/experts.py, une ligne par
+    tentative) mais n'était consultable nulle part avant ce endpoint."""
+    conv = await _load_conv(session, conversation_id, user)
+    if not any(m.id == message_id for m in conv.messages):
+        raise HTTPException(status_code=404, detail="Message introuvable")
+    rows = (
+        await session.execute(
+            select(RetrievalTrace)
+            .where(RetrievalTrace.message_id == message_id)
+            .order_by(RetrievalTrace.sous_question_index, RetrievalTrace.tentative)
+        )
+    ).scalars().all()
+    return [
+        RetrievalTraceOut(
+            sous_question_index=t.sous_question_index, sous_question_texte=t.sous_question_texte,
+            expert=t.expert, tentative=t.tentative, query_utilisee=t.query_utilisee, filtres=t.filtres or {},
+            grade=t.grade, grade_method=t.grade_method, chunks_retournes=t.chunks_retournes or [],
+            abstention=t.abstention, created_at=t.created_at,
+        )
+        for t in rows
+    ]
 
 
 @router.get("/{conversation_id}", response_model=ConversationOut)
@@ -313,11 +370,9 @@ async def upload_conversation_document(
         raise HTTPException(status_code=400, detail="Fichier vide")
     filename = file.filename or "document.bin"
     dossier_id = conv.dossier_id
-    if can_write(user) and dossier_id is None:
-        doss = await ensure_dossier(session, conv, user)
-        dossier_id = doss.id
 
-    # "annexe" n'a de sens que scopé à un dossier — sans dossier, retombe
+    # "annexe" n'a de sens que scopé à un dossier — sans dossier (conversation
+    # de recherche libre), retombe
     # sur "patrimoine" (rien à scoper, §1.5).
     effective_role = role if (role == "patrimoine" or dossier_id is not None) else "patrimoine"
     doc, duplicate = await store_document(
@@ -425,7 +480,10 @@ async def export_conversation(
     if not can_write(user):
         raise HTTPException(status_code=403, detail="Export réservé au rédacteur, manager ou admin")
     conv = await _load_conv(session, conversation_id, user)
-    doss = await ensure_dossier(session, conv, user)
+    try:
+        doss = await require_dossier(session, conv)
+    except DossierRequisError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     msgs = sorted(conv.messages or [], key=lambda m: m.created_at)
     notes = "\n\n".join(f"{m.role}: {m.content}" for m in msgs[-12:])
     try:

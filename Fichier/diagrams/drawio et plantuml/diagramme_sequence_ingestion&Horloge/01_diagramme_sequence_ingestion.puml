@@ -1,0 +1,818 @@
+@startuml
+' ==========================================================================
+' DIAGRAMME DE SEQUENCE - PROCESSUS D'INGESTION (vue reelle et exhaustive)
+' Genere a partir du code source de backend_ao (V2), pas un schema generique.
+' Sources tracees : app/api/documents.py, app/services/document_upload.py,
+' app/services/queue.py, app/worker_settings.py, app/workers/ingest.py,
+' app/ingest/parse.py, app/ingest/chunk.py, app/ingest/classify_section.py,
+' app/ingest/index_qdrant.py, app/graph/extract.py, app/graph/entity_match.py,
+' app/graph/cypher.py, app/workflow/extract_structure.py,
+' app/services/purge_document.py, app/services/minio_client.py, app/config.py
+' ==========================================================================
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 220
+skinparam wrapWidth 260
+autonumber
+
+skinparam ArrowColor #333333
+skinparam sequenceLifeLineBorderColor #999999
+skinparam noteBackgroundColor #FFFFE0
+skinparam noteBorderColor #DAA520
+skinparam sequenceReferenceBackgroundColor #F0F8FF
+skinparam sequenceReferenceBorderColor #4682B4
+
+actor "Utilisateur\n(depose un document)" as User #FFD700
+participant "Interface Web\n(React)" as UI #87CEEB
+participant "API FastAPI\napi/documents.py" as API #ADD8E6
+participant "Service Upload\nservices/document_upload.py" as Upload #B0E0E6
+database "MinIO\n(bucket ao-raw)" as MinIO #E0D0F0
+database "Postgres\n(documents, chunks,\ndossiers, exigences...)" as DB #F08080
+queue "Redis / ARQ\n(file de jobs)" as Queue #DDA0DD
+participant "Worker Ingestion\nworkers/ingest.py" as Worker #98FB98
+participant "Parseur\nparse.py\n(pypdf/docling/\npaddleocr/docx/xlsx)" as Parser #FFB6C1
+participant "Classifieur de section\nclassify_section.py" as Classify #FFDAB9
+participant "Ollama\n(embeddings nomic-embed-text +\nLLM granite3.3:2b)" as Ollama #90EE90
+database "Qdrant\n(collection ao_chunks)" as Vec #87CEFA
+participant "Worker Graphe\ngraph/extract.py" as GraphWorker #C8A2C8
+participant "Resolution d'entites\ngraph/entity_match.py" as Resolver #FFE4B5
+database "Neo4j\n(Entity / REL)" as GraphDB #D3D3A0
+participant "Worker Structure\nworkflow/extract_structure.py" as StructWorker #ADD8E6
+
+title Diagramme de sequence - Ingestion d'un document (backend_ao, vue detaillee jusqu'aux fragments)
+
+== ETAPE 0 : Televersement synchrone et validations ==
+
+User -> UI : Depose un fichier\n(doc_role, doc_type, dossier_id?)
+activate UI #87CEEB
+UI -> API : POST /documents (multipart : file + metadonnees)
+activate API #ADD8E6
+
+alt doc_role non valide (hors patrimoine/dao_courant/dao_archive/annexe)
+    API --> UI : 400 "doc_role invalide"
+else doc_type fourni mais hors liste (rc/cctp/ccap/memoire/reference/dpgf/bpu/administratif/autre)
+    API --> UI : 400 "doc_type invalide"
+else doc_role == "annexe" ET dossier_id absent
+    API --> UI : 400 "annexe necessite dossier_id"
+else role utilisateur == "consultant"
+    API --> UI : 403 "consultant ne depose pas"
+else fichier vide (0 octet)
+    API --> UI : 400 "Fichier vide"
+else validations OK
+    opt doc_role in {dao_courant, dao_archive} ET dossier_id fourni
+        API -> DB : Charger Dossier (tenant check)
+        activate DB #F08080
+        alt dossier introuvable ou mauvais tenant
+            DB --> API : 404
+            API --> UI : 404 "dossier introuvable"
+        else dossier trouve
+            DB --> API : Dossier
+        end
+        deactivate DB
+    end
+
+    API -> Upload : store_document(tenant, file, doc_role, doc_type, dossier_id?)
+    activate Upload #B0E0E6
+    Upload -> Upload : sha256(contenu du fichier)
+
+    alt Document(tenant_id, sha256) deja existant
+        note right of Upload #FFE4E1
+          <b>Deduplication</b>
+          Aucun envoi MinIO, aucune ligne
+          Postgres creee, aucun job enqueue.
+        end note
+        Upload --> API : (document_existant, duplicate=true)
+    else nouveau document
+        Upload -> MinIO : PUT objet\nkey = tenant_id/uuid/filename
+        activate MinIO #E0D0F0
+        MinIO --> Upload : OK
+        deactivate MinIO
+
+        Upload -> DB : INSERT Document\n(status="pending", is_dao=role in dao_*, \ndossier_id si annexe)
+        activate DB #F08080
+        DB --> Upload : Document (id)
+        Upload -> DB : flush()
+
+        Upload -> Queue : enqueue_job("ingest_document", document_id)
+        activate Queue #DDA0DD
+        alt Redis/ARQ indisponible (exception a l'enqueue)
+            Queue --> Upload : erreur
+            Upload -> DB : status="failed", \ningest_error="File Redis/ARQ : ..."
+            note right of Upload #FFE4E1
+              Document cree mais jamais mis en file :
+              il restera visible en "failed" sans
+              qu'aucun worker ne l'ait jamais traite.
+            end note
+        else enqueue OK
+            Queue --> Upload : accuse de reception
+        end
+        deactivate Queue
+        deactivate DB
+        Upload --> API : (document, duplicate=false)
+    end
+    deactivate Upload
+
+    opt document lie a un dossier (dao_courant/dao_archive + dossier_id)
+        API -> DB : dossier.dao_document_id = document.id
+        activate DB #F08080
+        DB --> API : OK
+        deactivate DB
+    end
+
+    API -> DB : commit()
+    API --> UI : 201 DocumentOut (status="pending" ou "failed")
+end
+deactivate API
+UI --> User : "Document recu, traitement en cours..."
+deactivate UI
+
+note over Queue, Worker #FFFFE0
+  L'utilisateur peut continuer a travailler :
+  la suite se deroule de maniere asynchrone
+  (job ARQ "ingest_document", job_timeout=3600s,
+  max_jobs=2 workers concurrents)
+end note
+
+== ETAPE 1 : Prise en charge asynchrone et extraction par format ==
+
+Worker -> Queue : Consomme le job "ingest_document"
+activate Worker #98FB98
+activate Queue #DDA0DD
+Queue --> Worker : document_id
+deactivate Queue
+
+Worker -> DB : Charger Document
+activate DB #F08080
+alt document introuvable (supprime entre-temps)
+    DB --> Worker : None
+    Worker -> Worker : log erreur, return "missing:{id}"
+    note right of Worker #FFE4E1
+      Aucune ligne a mettre a jour :
+      le job se termine silencieusement.
+    end note
+else document trouve
+    DB --> Worker : Document
+    Worker -> DB : status="processing", ingest_error=None
+    DB --> Worker : OK
+end
+deactivate DB
+
+note over Worker, DB #FFFFE0
+  <b>pipeline_stages (JSONB sur Document)</b> : chaque etape
+  (parse/chunk/classify/embed/index/graph) horodate son
+  debut/fin ici via mark_stage() -- ajoute (migration 003,
+  10/09) pour diagnostiquer precisement ou un traitement
+  est bloque ou a echoue, sans attendre la fin du job.
+end note
+
+Worker -> MinIO : GET objet (bucket ao-raw)
+activate MinIO #E0D0F0
+MinIO --> Worker : bytes -> fichier temporaire
+deactivate MinIO
+
+Worker -> Parser : parse_file(tmp_path, filename, mime_type)
+activate Parser #FFB6C1
+
+alt suffixe .xlsx/.xlsm ou mime spreadsheetml
+    Parser -> Parser : openpyxl (read_only, data_only)\n1 page = 1 feuille, cap 400 lignes/feuille
+else suffixe .docx ou mime wordprocessingml
+    Parser -> Parser : python-docx\ndecoupage aux styles "Heading*"
+    opt aucun bloc produit
+        Parser -> Worker : leve ValueError("DOCX vide")
+    end
+else suffixe .txt/.md
+    Parser -> Parser : lecture UTF-8 (errors=replace), page unique
+else suffixe .pdf OU magic bytes "%PDF"
+    Parser -> Parser : _parse_pdf_pypdf() -> texte natif\n+ densite = caracteres / nb_pages
+
+    alt densite >= 40 caracteres/page  (PDF numerique)
+        alt import Docling OK et markdown non vide
+            Parser -> Parser : parser="docling" (texte structure, tableaux)
+        else Docling absent/vide
+            Parser -> Parser : parser="pypdf" (texte natif brut)
+        end
+    else densite < 40  (PDF scanne)
+        alt PaddleOCR installe
+            Parser -> Parser : PyMuPDF rasterise les pages (200 DPI)
+            alt USE_GPU=true
+                Parser -> Parser : tente PaddleOCR GPU (lang="fr")
+                alt RuntimeError lie a cuda/cudnn
+                    Parser -> Parser : fallback PaddleOCR CPU
+                else autre RuntimeError
+                    Parser -> Worker : exception propagee
+                end
+            else USE_GPU=false
+                Parser -> Parser : PaddleOCR CPU directement
+            end
+            Parser -> Parser : parser="paddleocr-gpu|cpu"\nocr_used=true, ocr_confidence=moyenne
+            note right of Parser #FFFFE0
+              <b>ocr_progress (JSONB)</b> : chaque page OCRisee
+              est ecrite au fur et a mesure -- une reprise
+              apres crash/timeout repart de la derniere page
+              faite plutot que de tout refaire depuis la page 1.
+            end note
+        else PaddleOCR absent
+            alt Docling disponible et non vide
+                Parser -> Parser : parser="docling" (fallback)
+            else pypdf a tout de meme du texte non vide
+                Parser -> Parser : parser="pypdf-sparse" (on garde quand meme)
+            else aucune option disponible
+                Parser -> Worker : leve ValueError\n("PDF scanne detecte et PaddleOCR/\nDocling absents : installer les extras")
+            end
+        end
+    end
+else suffixe image (.jpg/.png/.tiff/.webp...)
+    Parser -> Parser : _parse_image() -> tente PaddleOCR
+    alt aucune page OCR ou texte < 40 caracteres
+        Parser -> Parser : parser="image-actif-visuel", 0 page\n(traite comme visuel, PAS une erreur)
+    else texte OCR suffisant
+        Parser -> Parser : pages OCR normales
+    end
+else format non reconnu
+    alt lecture texte UTF-8 non vide
+        Parser -> Parser : parser="fallback-text"
+    else vide
+        Parser -> Worker : leve ValueError\n("Format non gere : {filename}")
+    end
+end
+
+Parser --> Worker : ParsedDocument(pages[], parser, ocr_used, page_count)
+deactivate Parser
+
+note right of Worker #FFE4E1
+  <b>Toute exception ci-dessus</b> remonte jusqu'au
+  bloc try/except global du job (etape 6) :
+  rollback -> status="failed", ingest_error tronque
+  a 4000 caracteres. Le fichier temporaire est
+  toujours supprime (finally), succes ou echec.
+end note
+
+== ETAPE 2 : Decoupage en chunks (hierarchie parent/enfant) ==
+
+Worker -> Worker : chunk_document(parsed)
+note right of Worker #FFFFE0
+  <b>Regles de decoupage :</b>
+  - Parent : segment de 8000 caracteres (PARENT_SIZE)
+  - Enfant : fenetre de 1100 caracteres, chevauchement
+    120 caracteres (CHILD_SIZE / CHILD_OVERLAP)
+  - token_count approx = len(texte) / 4
+  - heading_path herite du parsing (titre docx,
+    nom de feuille xlsx) : aucune detection de titre
+    au moment du chunking lui-meme
+end note
+
+alt bloc = un seul parent + une seule fenetre <= 1100 caracteres
+    Worker -> Worker : ne garder que la ligne "parent"\n(pas de ligne "enfant" redondante)
+else parent dont la fenetre unique tient dans 1100 caracteres
+    Worker -> Worker : ne garder que la ligne "parent"
+else cas general
+    Worker -> Worker : 1 ligne "parent" + N lignes "enfant"\n(extra.kind = parent|child)
+end
+
+alt aucun chunk produit ALORS QUE des pages existaient
+    Worker -> Worker : leve ValueError("Aucun chunk produit")
+    note right of Worker #FFE4E1
+      Erreur reelle de parsing -> propagee ->
+      status="failed"
+    end note
+else parsed.pages est vide (cas image-actif-visuel)
+    Worker -> Worker : retourne [] (0 chunk)
+    note right of Worker #FFFFE0
+      Cas attendu, PAS une erreur : le document
+      ira quand meme jusqu'a status="ready"
+      avec 0 chunk (asset visuel).
+    end note
+else chunks generes normalement
+    Worker -> DB : DELETE anciens ChunkRow du document\n(remplacement complet, pas fusion)
+    activate DB #F08080
+    DB --> Worker : OK
+    deactivate DB
+end
+
+== ETAPE 3 : Classification du type de section ==
+
+alt doc.doc_role == "annexe"
+    note right of Worker #FFFFE0
+      Les annexes ne recoivent jamais de
+      section_type : boucle entierement sautee.
+    end note
+else doc_role != "annexe"
+    loop pour chaque chunk "parent" du document
+        Worker -> Classify : classify_section_type_heuristic(\nheading_path, texte[:200])
+        activate Classify #FFDAB9
+        alt un motif regex correspond (rc/ccap/cctp/dpgf/bpu/\nmemoire/reference)
+            Classify --> Worker : section_type (methode="heuristic")
+        else aucun motif ET compteur LLM >= 40 (MAX_LLM_CLASSIFICATIONS_PER_DOC)
+            Classify --> Worker : section_type=None (methode="skipped_cap")
+            note right of Classify #FFE4E1
+              Plafond explicite pour eviter des heures
+              d'appels LLM sequentiels sur un DAO
+              volumineux (cas observe : 739 parents).
+            end note
+        else aucun motif, sous le plafond
+            Classify -> Ollama : POST /api/generate (format=json,\ntimeout=60s) sur classification
+            activate Ollama #90EE90
+            alt appel HTTP OK et reponse dans la liste autorisee
+                Ollama --> Classify : section_type (ex: "autre")
+            else timeout / erreur HTTP / JSON invalide / valeur hors liste
+                Ollama --> Classify : (aucune exception levee)
+                Classify -> Classify : retourne None
+                note right of Classify #FFFFE0
+                  Signal doux : ne bloque jamais
+                  l'ingestion.
+                end note
+            end
+            deactivate Ollama
+            Classify --> Worker : section_type (methode="llm")
+        end
+        deactivate Classify
+    end
+    Worker -> Worker : propage section_type de chaque\nparent vers tous ses enfants
+end
+
+Worker -> DB : INSERT nouveaux ChunkRow\n(texte, page, heading_path, parent_id, section_type)
+activate DB #F08080
+DB --> Worker : OK
+deactivate DB
+
+== ETAPE 4 : Embeddings et indexation vectorielle ==
+
+Worker -> Worker : embeddable = chunks "enfant"\n(ou "parent" si le bloc a ete fusionne)
+
+alt embeddable est vide (cas image-actif-visuel, 0 chunk)
+    note right of Worker #FFFFE0
+      Ollama et Qdrant totalement sautes :
+      on passe directement a status="ready".
+    end note
+else embeddable non vide
+    loop pour chaque texte a indexer (SEQUENTIEL, sans batch)
+        Worker -> Ollama : POST /api/embeddings\n(model=nomic-embed-text, prompt tronque a 8000 c.,\ntimeout=120s)
+        activate Ollama #90EE90
+        alt reponse sans champ "embedding" / HTTP erreur / injoignable
+            Ollama --> Worker : exception RuntimeError
+            note right of Worker #FFE4E1
+              Propage jusqu'au bloc try/except global
+              -> status="failed".
+            end note
+        else OK
+            Ollama --> Worker : vecteur (dim 768)
+        end
+        deactivate Ollama
+    end
+
+    Worker -> Vec : ensure_collection() (idempotent :\ncree ao_chunks, cosine, dim 768, si absente)
+    activate Vec #87CEFA
+    Vec --> Worker : OK
+
+    Worker -> Vec : upsert_chunks(points)\npayload = document_id, tenant_id, doc_role,\nheading_path, page, page_group, parent_id,\ntexte[:2000], section_type, dossier_id
+    note right of Vec #FFE4E1
+      Upsert pur (pas de delete prealable) :
+      un re-ingest sans purge peut laisser des
+      vecteurs orphelins de l'ancienne version
+      (nouveaux UUID de chunks a chaque passage).
+    end note
+    Vec --> Worker : OK
+    deactivate Vec
+end
+
+Worker -> DB : status="ready", ocr_used, ocr_confidence,\npage_count, ingest_error=None
+activate DB #F08080
+DB --> Worker : OK
+deactivate DB
+
+note over Worker, DB #98FB98
+  Document PRET pour le RAG (recherche
+  vectorielle disponible immediatement).
+end note
+
+alt exception non geree n'importe ou dans les etapes 1 a 4
+    Worker -> Worker : rollback session
+    Worker -> DB : status="failed",\ningest_error = "{type}: {message}"[:4000]
+    activate DB #F08080
+    DB --> Worker : OK
+    deactivate DB
+    Worker -> Worker : return "failed:{document_id}"
+    note right of Worker #FFE4E1
+      Ce except attrape TOUT et retourne
+      normalement : ARQ ne voit PAS d'exception,
+      donc ne re-essaie PAS automatiquement ce job
+      (le retry ARQ ne joue que si l'erreur survient
+      hors de ce bloc try/except).
+    end note
+else succes
+    Worker -> Queue : enqueue_job("extract_graph", document_id)\n(TOUJOURS, quel que soit doc_role)
+    activate Queue #DDA0DD
+    Queue --> Worker : OK
+    deactivate Queue
+end
+Worker -> Worker : finally : supprime le fichier temporaire
+deactivate Worker
+
+== ETAPE 5 : Extraction du graphe de connaissances (job separe, non bloquant) ==
+
+note right of GraphWorker #FFFFE0
+  Phase non bloquante : le RAG textuel
+  fonctionne deja sans elle.
+end note
+
+GraphWorker -> Queue : Consomme le job "extract_graph"
+activate GraphWorker #C8A2C8
+activate Queue #DDA0DD
+Queue --> GraphWorker : document_id
+deactivate Queue
+
+GraphWorker -> DB : Charger Document
+activate DB #F08080
+alt document introuvable OU status != "ready"
+    DB --> GraphWorker : etat invalide
+    GraphWorker -> GraphWorker : log warning, return "skip:{id}"
+else document.graph_extracted deja true
+    DB --> GraphWorker : deja extrait
+    GraphWorker -> GraphWorker : return "already:{id}"\n(garde d'idempotence, reutilisee par\nl'endpoint POST /documents/{id}/promouvoir)
+else a traiter
+    DB --> GraphWorker : Document (status="ready")
+    GraphWorker -> DB : Charger TOUS les chunks "parent"\n(aucune limite depuis la V2 ; l'ancien\nplafond de 12 parents a ete retire)
+    DB --> GraphWorker : liste des chunks parents
+end
+deactivate DB
+
+GraphWorker -> GraphDB : Creer contrainte unique (:Entity).key\nsi absente
+activate GraphDB #D3D3A0
+GraphDB --> GraphWorker : OK
+
+GraphWorker -> GraphDB : Charger tous les Entity du tenant\n(index de resolution)
+GraphDB --> GraphWorker : EntityMatchIndex (tenant)
+deactivate GraphDB
+
+loop pour chaque chunk parent
+    GraphWorker -> Ollama : POST /api/generate (format=json,\ntimeout=180s) : extraction entites/relations
+    activate Ollama #90EE90
+    note right of Ollama #FFFFE0
+      Types d'entites autorises : ENTREPRISE, PROJET,
+      CLIENT, CERTIFICATION, PERSONNE, EXIGENCE, LOT, SITE
+      Types de relations autorises : A_TRAVAILLE_SUR,
+      PORTE, CONCERNE, SITUE_A, SATISFAITE_PAR, CONTIENT
+    end note
+    alt exception reseau / timeout sur l'appel Ollama
+        Ollama --> GraphWorker : exception
+        GraphWorker -> GraphWorker : log, note en memoire\n(non persistee en DB), continue au chunk suivant
+        note right of GraphWorker #FFE4E1
+          N'interrompt PAS le job entier : un chunk
+          en echec n'empeche pas les autres.
+        end note
+    else reponse non-JSON
+        Ollama --> GraphWorker : {} silencieux\n({"entities":[],"relations":[]})
+    else reponse JSON valide
+        Ollama --> GraphWorker : {entities:[...], relations:[...]}
+
+        loop pour chaque entite extraite
+            alt type hors liste autorisee OU nom vide
+                GraphWorker -> GraphWorker : ignorer
+            else valide
+                GraphWorker -> Resolver : resolve(nom, type, tenant)
+                activate Resolver #FFE4B5
+                alt correspondance exacte (normalisee)
+                    Resolver --> GraphWorker : cle existante (score 100, "exact")
+                else Levenshtein >= 85
+                    Resolver --> GraphWorker : cle existante ("levenshtein")
+                else token_set_ratio >= 80
+                    Resolver --> GraphWorker : cle existante ("jaccard_token_set")
+                else similarite cosinus embeddings >= 0.82\n(si use_embeddings=true)
+                    Resolver -> Ollama : embed(nom) si non cache
+                    Ollama --> Resolver : vecteur
+                    Resolver --> GraphWorker : cle existante ("embedding")
+                else aucune correspondance
+                    Resolver -> Resolver : cree nouvelle cle\n"{tenant}:{type}:{nom_normalise}"
+                    Resolver --> GraphWorker : nouvelle cle
+                end
+                note right of Resolver #FFE4E1
+                  Une correspondance floue n'est reutilisee que
+                  si le type d'entite correspond aussi (evite les
+                  collisions ENTREPRISE / PROJET de meme nom).
+                  Si rapidfuzz n'est pas installe : les etages
+                  Levenshtein/token_set sont sautes silencieusement.
+                end note
+                deactivate Resolver
+                GraphWorker -> GraphDB : MERGE (e:Entity {key})\nSET name, type, tenant_id
+                activate GraphDB #D3D3A0
+                GraphDB --> GraphWorker : OK
+                deactivate GraphDB
+            end
+        end
+
+        loop pour chaque relation extraite
+            alt type hors liste autorisee
+                GraphWorker -> GraphWorker : ignorer
+            else valide
+                GraphWorker -> Resolver : resolve(from) et resolve(to)\n(index local au chunk)
+                activate Resolver #FFE4B5
+                alt une des deux extremites non resolue
+                    Resolver --> GraphWorker : echec
+                    GraphWorker -> GraphWorker : relation abandonnee\n(compteur n_rel_dropped++)
+                else les deux resolues
+                    Resolver --> GraphWorker : cle_from, cle_to
+                    GraphWorker -> GraphDB : MATCH a, b\nMERGE (a)-[r:REL {type}]->(b)\nSET r.source_chunk_id
+                    activate GraphDB #D3D3A0
+                    GraphDB --> GraphWorker : OK
+                    deactivate GraphDB
+                end
+                deactivate Resolver
+            end
+        end
+    end
+    deactivate Ollama
+end
+
+alt tout s'est bien passe
+    GraphWorker -> DB : doc.graph_extracted = true
+    activate DB #F08080
+    DB --> GraphWorker : OK
+    deactivate DB
+else exception non geree (connexion Neo4j perdue, etc.)
+    GraphWorker -> GraphWorker : log, return "graph_failed:{id}"
+    note right of GraphWorker #FFE4E1
+      graph_extracted reste false, MAIS aucun champ
+      d'erreur persiste sur Document pour ce cas
+      (contrairement a ingest_error) : un echec de
+      graphe n'est visible que dans les logs du worker.
+    end note
+end
+GraphWorker -> GraphWorker : finally : ferme le driver Neo4j
+deactivate GraphWorker
+
+note over User, GraphDB #F0F8FF
+  Ingestion terminee :
+  - RAG textuel (Qdrant) : disponible des ETAPE 4
+  - Graphe de connaissances (Neo4j) : disponible
+    apres ETAPE 5 (peut echouer sans bloquer le RAG)
+end note
+
+== ETAPE 6 (a la demande utilisateur) : Analyse de structure du dossier ==
+
+note right of StructWorker #FFFFE0
+  Declenchee uniquement par une action explicite :
+  POST /dossiers/{id}/analyser. Necessite qu'un
+  document DAO soit deja lie ET pret (status="ready").
+end note
+
+User -> UI : Demande l'analyse du dossier
+activate UI #87CEEB
+UI -> API : POST /dossiers/{id}/analyser
+activate API #ADD8E6
+API -> DB : Charger Dossier + Document DAO lie
+activate DB #F08080
+
+alt dossier.status == "analyzing" deja en cours
+    DB --> API : deja en cours
+    API --> UI : 409 conflit\n(evite un double lancement concurrent)
+else aucun dao_document_id
+    DB --> API : absent
+    API --> UI : 400 "aucun DAO a analyser"
+else document DAO en status="failed"
+    DB --> API : echec d'ingestion
+    API --> UI : 400 (ingest_error remonte)
+else document DAO pas encore "ready" (pending/processing)
+    DB --> API : pas pret
+    API --> UI : 409 "DAO encore en cours de lecture"
+else document DAO pret
+    DB --> API : OK
+    API -> DB : dossier.status = "analyzing"
+    DB --> API : OK
+    deactivate DB
+    API -> Queue : enqueue_job("extract_dossier_structure", dossier_id)
+    activate Queue #DDA0DD
+    Queue --> API : OK
+    deactivate Queue
+    API --> UI : 202 "analyse en cours"
+end
+deactivate API
+UI --> User : "Analyse en cours..."
+deactivate UI
+
+StructWorker -> Queue : Consomme le job
+activate StructWorker #ADD8E6
+activate Queue #DDA0DD
+Queue --> StructWorker : dossier_id
+deactivate Queue
+
+StructWorker -> DB : DELETE ExigenceRow + OutlineItem existants\n(re-analyse = remplacement complet, pas cumul)
+activate DB #F08080
+DB --> StructWorker : OK
+deactivate DB
+
+note right of StructWorker #FFFFE0
+  Ce nettoyage prealable evite un bug historique
+  de quasi-duplication observe lors de re-analyses.
+end note
+
+group extract_outline
+    StructWorker -> DB : Charger chunks "rc" du document DAO
+    activate DB #F08080
+    DB --> StructWorker : texte RC
+    deactivate DB
+    alt texte RC contient un mot-cle de plan\n(ex: "structure de la reponse")
+        StructWorker -> Ollama : extraction JSON des titres ordonnes
+        activate Ollama #90EE90
+        alt appel LLM OK et titres extraits
+            Ollama --> StructWorker : liste de titres
+            StructWorker -> StructWorker : cree OutlineItem par titre\n(archetype devine par mots-cles)
+        else exception OU aucun titre
+            Ollama --> StructWorker : echec
+            StructWorker -> StructWorker : fallback -> DEFAULT_OUTLINE\n(5 sections standard)
+        end
+        deactivate Ollama
+    else aucun mot-cle de plan detecte
+        StructWorker -> StructWorker : fallback -> DEFAULT_OUTLINE
+    end
+end
+
+group extract_exigences
+    StructWorker -> DB : Charger tous les parents SAUF\nsection_type == "bpu" (tableaux de prix exclus)
+    activate DB #F08080
+    DB --> StructWorker : chunks parents
+    deactivate DB
+    StructWorker -> StructWorker : regroupe les parents en lots\nde <= 14000 caracteres (_EXIGENCES_BATCH_MAX_CHARS)
+    loop pour chaque lot
+        StructWorker -> Ollama : extraction JSON des exigences\n(num_ctx=4096, timeout=150s)
+        activate Ollama #90EE90
+        alt echec de l'appel LLM pour ce lot
+            Ollama --> StructWorker : exception
+            StructWorker -> StructWorker : exigences du lot perdues\n(pas de retry), continue au lot suivant
+        else succes
+            Ollama --> StructWorker : liste d'exigences brutes
+            loop pour chaque exigence
+                alt type hors {eliminatoire, technique,\nadministrative, financiere, delai, reference}
+                    StructWorker -> StructWorker : rejetee
+                else type valide
+                    StructWorker -> Resolver : dedoublonnage fuzzy\n(exact/levenshtein/token_set, SANS embeddings)
+                    activate Resolver #FFE4B5
+                    Resolver --> StructWorker : conserver ou fusionner
+                    deactivate Resolver
+                end
+            end
+        end
+        deactivate Ollama
+    end
+    StructWorker -> DB : INSERT ExigenceRow (statut="a_couvrir")
+    activate DB #F08080
+    DB --> StructWorker : OK
+    deactivate DB
+end
+
+group extract_checklist_administrative
+    StructWorker -> StructWorker : depart = STANDARD_PIECES\n(6 pieces administratives fixes : KBIS, assurance\ndecennale, regularite fiscale/sociale, DC1, DC2...)
+    alt texte RC contient un mot-cle de pieces demandees
+        StructWorker -> Ollama : extraction JSON de la liste de pieces
+        activate Ollama #90EE90
+        alt succes et liste non vide
+            Ollama --> StructWorker : liste de pieces personnalisee
+        else echec ou vide
+            Ollama --> StructWorker : (rien)
+            StructWorker -> StructWorker : conserve STANDARD_PIECES
+        end
+        deactivate Ollama
+    end
+    loop pour chaque piece
+        StructWorker -> DB : recherche Document existant\ndoc_type="administratif" (le plus recent)
+        activate DB #F08080
+        alt trouve
+            DB --> StructWorker : document
+            StructWorker -> StructWorker : statut = "trouve_patrimoine"
+        else absent
+            DB --> StructWorker : rien
+            StructWorker -> StructWorker : statut = "manquant"
+        end
+        deactivate DB
+    end
+    StructWorker -> DB : INSERT DossierPiece
+    activate DB #F08080
+    DB --> StructWorker : OK
+    deactivate DB
+end
+
+group classify_exigences_sections (job separe "classify_dossier_sections",\nrejouable independamment des 3 groupes precedents)
+    StructWorker -> DB : Charger ExigenceRow + OutlineItem du dossier
+    activate DB #F08080
+    DB --> StructWorker : exigences (max 25 par lot) + sections du plan
+    deactivate DB
+    loop pour chaque lot de 25 exigences
+        StructWorker -> Ollama : extraction JSON des associations\nexigence_index -> section_indices[]\n(num_ctx=4096, timeout=150s)
+        activate Ollama #90EE90
+        alt echec de l'appel LLM pour ce lot
+            Ollama --> StructWorker : exception, lot ignore
+        else succes
+            Ollama --> StructWorker : associations (une exigence peut\nn'etre associee a AUCUNE section)
+        end
+        deactivate Ollama
+    end
+    StructWorker -> DB : INSERT ExigenceSection\nON CONFLICT (exigence_id, outline_item_id) DO NOTHING
+    activate DB #F08080
+    note right of DB #FFFFE0
+      Ne touche JAMAIS un couple deja decide par un
+      humain (origine="humain") : une relance ne peut
+      qu'ajouter de nouvelles associations, jamais en
+      ecraser une confirmee manuellement.
+    end note
+    DB --> StructWorker : OK
+    deactivate DB
+end
+
+alt les 4 groupes ci-dessus reussissent
+    StructWorker -> DB : dossier.status = "generating"
+    activate DB #F08080
+    DB --> StructWorker : OK
+    deactivate DB
+else exception dans un des 4 groupes
+    StructWorker -> StructWorker : rollback, log,\nreturn "failed:{dossier_id}"
+    note right of StructWorker #FFE4E1
+      Point d'ambiguite releve : aucun statut
+      "failed" n'existe pour Dossier et aucun champ
+      d'erreur n'est prevu -> apres rollback, le
+      dossier reste bloque visuellement sur son
+      etat precedent sans message explicite.
+    end note
+end
+deactivate StructWorker
+
+== ETAPE 7 : Suppression / purge d'un document ==
+
+User -> UI : Demande la suppression d'un document
+activate UI #87CEEB
+UI -> API : DELETE /documents/{id}
+activate API #ADD8E6
+
+alt role == "admin"
+    API -> API : autorise
+else role == "manager" ET permissions.can_delete != false
+    API -> API : autorise
+else autre role
+    API --> UI : 403 refuse
+end
+
+API -> Vec : DELETE points WHERE document_id = id
+activate Vec #87CEFA
+Vec --> API : OK
+deactivate Vec
+
+API -> GraphDB : DELETE relations REL dont\nsource_chunk_id appartient au document
+activate GraphDB #D3D3A0
+GraphDB --> API : OK
+API -> GraphDB : DELETE entites Entity du tenant\ndevenues orphelines (0 relation restante)
+note right of GraphDB #FFE4E1
+  Nettoyage a l'echelle du TENANT, pas
+  strictement limite aux entites de ce document.
+end note
+GraphDB --> API : OK
+deactivate GraphDB
+
+API -> MinIO : DELETE objet (bucket ao-raw)
+activate MinIO #E0D0F0
+alt objet deja absent (NoSuchKey/NoSuchObject/NoSuchBucket)
+    MinIO --> API : traite comme deja supprime (pas d'erreur)
+else suppression normale
+    MinIO --> API : OK
+end
+deactivate MinIO
+
+API -> DB : DELETE ChunkRow (enfants puis parents)\npuis DELETE Document
+activate DB #F08080
+alt exception a n'importe quelle etape de la purge
+    DB --> API : erreur
+    API -> API : rollback, 500
+    note right of API #FFE4E1
+      Purge partielle possible : si Qdrant/Neo4j/MinIO
+      ont deja ete nettoyes mais que Postgres echoue,
+      il n'existe pas de transaction compensatoire.
+    end note
+else succes complet
+    DB --> API : OK
+    API --> UI : 200 OK
+end
+deactivate DB
+deactivate API
+UI --> User : "Document supprime"
+deactivate UI
+
+' ==========================================================================
+' LEGENDE
+' ==========================================================================
+legend right
+  | <color:#FFD700>Utilisateur</color> | Acteur humain |
+  | <color:#87CEEB>Interface Web</color> | Frontend React |
+  | <color:#ADD8E6>API FastAPI</color> | Validation, orchestration synchrone |
+  | <color:#B0E0E6>Service Upload</color> | Dedup + stockage + enqueue |
+  | <color:#E0D0F0>MinIO</color> | Stockage objet (fichier original) |
+  | <color:#F08080>Postgres</color> | Verite metier (documents, chunks, dossiers) |
+  | <color:#DDA0DD>Redis / ARQ</color> | File de jobs asynchrones |
+  | <color:#98FB98>Worker Ingestion</color> | Orchestration du traitement d'un document |
+  | <color:#FFB6C1>Parseur</color> | pypdf / Docling / PaddleOCR / python-docx / openpyxl |
+  | <color:#FFDAB9>Classifieur de section</color> | Heuristique regex + LLM (avec plafond) |
+  | <color:#90EE90>Ollama</color> | Embeddings (nomic-embed-text) + LLM (granite3.3:2b) |
+  | <color:#87CEFA>Qdrant</color> | Index vectoriel (recherche semantique) |
+  | <color:#C8A2C8>Worker Graphe</color> | Extraction entites/relations (job separe) |
+  | <color:#FFE4B5>Resolution d'entites</color> | Dedoublonnage exact/fuzzy/embedding |
+  | <color:#D3D3A0>Neo4j</color> | Graphe de connaissances (Entity / REL) |
+endlegend
+
+@enduml

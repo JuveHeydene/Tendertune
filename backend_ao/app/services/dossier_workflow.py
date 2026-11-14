@@ -12,9 +12,10 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
-from app.models.sql import Conversation, Dossier, Export, Generation, OutlineItem
+from app.models.sql import Conversation, Dossier, ExigenceRow, ExigenceSection, Export, Generation, OutlineItem
 from app.services.minio_client import get_minio
-from app.workflow.sections import DEFAULT_OUTLINE, archetype_for_key
+from app.services.pdf_export import build_pdf, sections_from_pairs
+from app.workflow.sections import archetype_for_key
 
 log = logging.getLogger("btp.dossier")
 
@@ -28,35 +29,25 @@ MIME = {
 EXT = {"docx": "docx", "pdf": "pdf", "md": "md", "txt": "txt"}
 
 
-async def ensure_dossier(session: AsyncSession, conv: Conversation, user) -> Dossier:
+class DossierRequisError(ValueError):
+    """Levée quand une action (rédaction, export, dépôt de pièce scopée) est
+    tentée sur une conversation qui n'est associée à aucun dossier.
+
+    Un dossier se crée désormais UNIQUEMENT via `POST /dossiers`, DAO chargé
+    puis analysé (§9) — plus jamais en sous-produit lazy d'une conversation
+    avec un outline générique inventé avant lecture du DAO."""
+
+
+async def require_dossier(session: AsyncSession, conv: Conversation) -> Dossier:
     if conv.dossier_id:
         doss = await session.get(Dossier, conv.dossier_id)
         if doss is not None:
             return doss
-    doss = Dossier(
-        tenant_id=user.tenant_id,
-        created_by=user.id,
-        project_name=conv.title or "Mémoire conversation",
-        status="generating",
+    raise DossierRequisError(
+        "Cette conversation n'est associée à aucun dossier. Créez d'abord un dossier "
+        "(Dossiers AO → Nouveau dossier), chargez son DAO, puis démarrez la conversation "
+        "depuis ce dossier."
     )
-    session.add(doss)
-    await session.flush()
-    for i, (key, level, title) in enumerate(DEFAULT_OUTLINE):
-        session.add(
-            OutlineItem(
-                dossier_id=doss.id,
-                key=key,
-                heading_level=level,
-                title=title,
-                sort_order=i,
-                status="todo",
-                archetype=archetype_for_key(key),
-            )
-        )
-    conv.dossier_id = doss.id
-    await session.flush()
-    log.info("dossier créé id=%s conversation=%s", doss.id, conv.id)
-    return doss
 
 
 async def ensure_outline_item(
@@ -88,6 +79,38 @@ async def ensure_outline_item(
     session.add(row)
     await session.flush()
     return row
+
+
+async def latest_section_markdown(session: AsyncSession, dossier_id: UUID, section_key: str) -> str | None:
+    """Texte de la dernière version d'une section, ou None si jamais générée
+    — utilisé pour enrichir une section existante depuis la conversation
+    (§ ajouter du contenu, plutôt que régénérer à l'aveugle)."""
+    gen = (
+        await session.execute(
+            select(Generation)
+            .where(Generation.dossier_id == dossier_id, Generation.section_key == section_key)
+            .order_by(Generation.version.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if gen is None:
+        return None
+    return (gen.content or {}).get("texte")
+
+
+async def active_exigences_for_section(session: AsyncSession, outline_item_id: UUID) -> list[dict]:
+    """Exigences actives (proposées ou confirmées, jamais exclues) liées à
+    cette section — à injecter dans generate_section() pour que la
+    rédaction traite VRAIMENT les exigences du DAO, pas juste le contexte
+    patrimoine générique remonté par la recherche agentique."""
+    rows = (
+        await session.execute(
+            select(ExigenceRow)
+            .join(ExigenceSection, ExigenceSection.exigence_id == ExigenceRow.id)
+            .where(ExigenceSection.outline_item_id == outline_item_id, ExigenceSection.statut != "exclue")
+        )
+    ).scalars().all()
+    return [{"id": str(e.id), "libelle": e.libelle, "type": e.type} for e in rows]
 
 
 async def save_generation(
@@ -161,8 +184,7 @@ async def latest_sections(session: AsyncSession, dossier_id: UUID) -> list[tuple
     return out
 
 
-async def _section_rows(session: AsyncSession, dossier_id: UUID) -> tuple[list[tuple[str, str]], list[str]]:
-    pairs = await latest_sections(session, dossier_id)
+def _rows_from_pairs(pairs) -> tuple[list[tuple[str, str]], list[str]]:
     rows: list[tuple[str, str]] = []
     keys: list[str] = []
     for item, gen in pairs:
@@ -209,44 +231,15 @@ def _build_docx(*, project_name: str, rows: list[tuple[str, str]], transcript: s
     return buf.getvalue()
 
 
-def _build_pdf(*, project_name: str, rows: list[tuple[str, str]], transcript: str | None) -> bytes:
-    from io import BytesIO
-
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-    from reportlab.lib.units import cm
-    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
-
-    buf = BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=2 * cm, rightMargin=2 * cm, topMargin=2 * cm, bottomMargin=2 * cm)
-    styles = getSampleStyleSheet()
-    title_style = ParagraphStyle("TitleFr", parent=styles["Title"], fontName="Helvetica-Bold", spaceAfter=14)
-    h2_style = ParagraphStyle("H2Fr", parent=styles["Heading2"], fontName="Helvetica-Bold", spaceBefore=12, spaceAfter=6)
-    body_style = ParagraphStyle("BodyFr", parent=styles["Normal"], fontName="Helvetica", leading=14, spaceAfter=6)
-
-    def esc(text: str) -> str:
-        return (
-            text.replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;")
-            .replace("\n", "<br/>")
-        )
-
-    story: list = [Paragraph(esc(project_name or "Mémoire technique"), title_style), Spacer(1, 0.3 * cm)]
-    if transcript and not rows:
-        story.append(Paragraph(esc("Brouillon"), h2_style))
-        story.append(Paragraph(esc(transcript), body_style))
-    for title, texte in rows:
-        story.append(Paragraph(esc(title), h2_style))
-        for para in (texte or "").split("\n"):
-            if para.strip():
-                story.append(Paragraph(esc(para.strip()), body_style))
-        story.append(Spacer(1, 0.2 * cm))
-    doc.build(story)
-    return buf.getvalue()
-
-
-def _render_export(fmt: str, *, project_name: str, rows: list[tuple[str, str]], transcript: str | None) -> bytes:
+def _render_export(
+    fmt: str,
+    *,
+    project_name: str,
+    rows: list[tuple[str, str]],
+    transcript: str | None,
+    sections: list[dict] | None = None,
+    version: int = 1,
+) -> bytes:
     if fmt == "docx":
         return _build_docx(project_name=project_name, rows=rows, transcript=transcript)
     if fmt == "md":
@@ -254,7 +247,9 @@ def _render_export(fmt: str, *, project_name: str, rows: list[tuple[str, str]], 
     if fmt == "txt":
         return _build_txt(project_name=project_name, rows=rows, transcript=transcript)
     if fmt == "pdf":
-        return _build_pdf(project_name=project_name, rows=rows, transcript=transcript)
+        return build_pdf(
+            project_name=project_name, sections=sections or [], transcript=transcript, version=version
+        )
     raise ValueError(f"format inconnu : {fmt}")
 
 
@@ -268,14 +263,17 @@ async def export_document(
 ) -> tuple[Export, bytes]:
     if fmt not in EXPORT_FORMATS:
         raise ValueError(f"Format {fmt!r} non supporté")
-    rows, keys = await _section_rows(session, dossier.id)
+    version = int(dossier.current_version or 1)
+    pairs = await latest_sections(session, dossier.id)
+    rows, keys = _rows_from_pairs(pairs)
     data = _render_export(
         fmt,
         project_name=dossier.project_name or "Mémoire",
         rows=rows,
         transcript=transcript,
+        sections=sections_from_pairs(pairs) if fmt == "pdf" else None,
+        version=version,
     )
-    version = int(dossier.current_version or 1)
     settings = get_settings()
     ext = EXT[fmt]
     object_key = f"{dossier.tenant_id}/exports/{dossier.id}/v{version}.{ext}"

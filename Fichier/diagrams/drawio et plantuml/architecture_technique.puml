@@ -1,0 +1,96 @@
+@startuml architecture_technique
+' =============================================================================
+' Architecture technique : mêmes couches que l'architecture logicielle,
+' avec les technologies effectivement mises en œuvre.
+' =============================================================================
+skinparam backgroundColor white
+skinparam defaultFontName "Latin Modern Roman"
+skinparam defaultFontColor black
+skinparam defaultFontSize 14
+skinparam shadowing false
+skinparam roundCorner 4
+skinparam ArrowColor #444444
+skinparam ArrowFontSize 12
+skinparam componentStyle uml2
+skinparam nodesep 14
+skinparam ranksep 26
+
+skinparam component {
+  BorderColor #555555
+  FontSize 13
+}
+skinparam package {
+  BorderColor #777777
+  BackgroundColor #FBFBFB
+  FontSize 14
+  FontStyle bold
+}
+skinparam database {
+  BorderColor #555555
+  FontSize 12
+}
+
+title Architecture technique — technologies mises en œuvre
+
+package "Présentation — React 19, TypeScript, Vite" as L1 {
+  component "Pages documents\net dossiers" as I1 #9DC3E6
+  component "Conversation\n<size:11><i>fetch + ReadableStream</i></size>" as I2 #9DC3E6
+  component "Rendu markdown\n<size:11><i>react-markdown, remark-gfm</i></size>" as I3 #9DC3E6
+}
+
+package "Passerelle — FastAPI / Uvicorn" as L2 {
+  component "Sécurité\n<size:11><i>PyJWT, bcrypt</i></size>" as G1 #B4C7E7
+  component "Routeurs REST\n<size:11><i>documents, conversations,</i></size>\n<size:11><i>dossiers, exports</i></size>" as G2 #B4C7E7
+  component "Flux SSE\n<size:11><i>StreamingResponse</i></size>" as G3 #B4C7E7
+}
+
+package "Orchestration — LangGraph, SQLAlchemy async" as L3 {
+  component "chat_pipeline" as O1 #D9B3D9
+  component "superviseur\n<size:11><i>JSON contraint</i></size>" as O2 #D9B3D9
+  component "agentic_pipeline\n<size:11><i>experts, boucle CRAG</i></size>" as O3 #D9B3D9
+  component "dossier_workflow" as O4 #D9B3D9
+}
+
+package "Traitement — worker ARQ et bibliothèques" as L4 {
+  component "Ingestion\n<size:11><i>Docling, PaddleOCR (GPU)</i></size>\n<size:11><i>pypdf, python-docx</i></size>" as T1 #C6E0B4
+  component "Recherche\n<size:11><i>dense + BM25, fusion RRF</i></size>\n<size:11><i>reranker BGE</i></size>" as T2 #C6E0B4
+  component "Graphe\n<size:11><i>Cypher, RapidFuzz</i></size>" as T3 #C6E0B4
+  component "Livrables\n<size:11><i>WeasyPrint, python-docx</i></size>" as T4 #C6E0B4
+}
+
+package "Persistance — services conteneurisés" as L5 {
+  database "PostgreSQL\n<size:11><i>pgvector</i></size>" as P1 #AED6F1
+  database "Qdrant" as P2 #AED6F1
+  database "Neo4j" as P3 #D7DBA0
+  database "MinIO\n<size:11><i>objets S3</i></size>" as P4 #FFD966
+  queue "Redis\n<size:11><i>file ARQ</i></size>" as P5 #FBE5B6
+}
+
+package "Services transverses" as LM {
+  component "**Ollama**\n<size:11><i>Granite 3.3 2B</i></size>\n<size:11><i>nomic-embed-text</i></size>\n<size:11><i>GPU NVIDIA</i></size>" as MODELS #F4B6C2
+}
+
+I2 -down-> G3 : HTTP / SSE
+G3 -down-> O1
+O1 -down-> O2
+O2 -down-> O3
+O1 -down-> O4
+
+O3 -down-> T2
+O4 -down-> T4
+G2 -down-> T1 : mise en file
+
+T1 -down-> P2
+T1 -down-> P4
+T1 -down-> P5
+T2 -down-> P2
+T3 -down-> P3
+T4 -down-> P1
+
+O2 .right.> MODELS : /api/generate
+T2 .right.> MODELS : /api/embeddings
+
+L5 -[hidden]right- LM
+L4 -[hidden]right- LM
+
+@enduml

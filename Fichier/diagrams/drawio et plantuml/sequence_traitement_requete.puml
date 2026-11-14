@@ -1,0 +1,80 @@
+@startuml sequence_traitement_requete
+skinparam backgroundColor white
+skinparam defaultFontName "Latin Modern Roman"
+skinparam defaultFontColor black
+skinparam defaultFontSize 15
+skinparam shadowing false
+skinparam sequenceMessageAlign center
+skinparam ArrowColor #333333
+skinparam sequenceLifeLineBorderColor #666666
+skinparam noteBorderColor #999999
+skinparam noteBackgroundColor #FFFFE0
+skinparam sequenceGroupBorderColor #666666
+skinparam sequenceGroupBackgroundColor #F5F5F5
+
+actor "Utilisateur" as U #FFD966
+participant "Interface\nconversationnelle" as UI #9DC3E6
+participant "Passerelle API" as API #B4C7E7
+participant "Superviseur" as SUP #D9B3D9
+participant "Agents experts" as EXP #C6E0B4
+participant "Agrégateur" as AGG #FBE5B6
+participant "Générateur" as GEN #F4B6C2
+database "Base de\nconnaissances" as KB #AED6F1
+
+title Traitement d'une requête conversationnelle (horloge B)
+
+U -> UI : pose une question
+activate UI
+UI -> API : envoie le message
+activate API
+API -> SUP : transmet la requête
+activate SUP
+
+SUP -> SUP : clarifie, classe l'intention\net découpe en sous-questions
+
+alt intention triviale (salutation, export)
+  SUP --> API : réponse directe, sans recherche
+else besoin d'une recherche documentaire ou métier
+  loop pour chaque sous-question, en parallèle
+    SUP -> EXP : route vers le ou les experts concernés
+    activate EXP
+    loop boucle de récupération bornée
+      EXP -> KB : interroge (recherche, filtres)
+      activate KB
+      KB --> EXP : résultats
+      deactivate KB
+      EXP -> EXP : qualifie le résultat\n(suffisant, ambigu, insuffisant)
+    end
+    EXP --> AGG : contexte qualifié ou abstention
+    deactivate EXP
+  end
+  activate AGG
+  AGG -> AGG : fusionne les contextes\net les abstentions
+  AGG -> GEN : contexte agrégé
+  deactivate AGG
+  activate GEN
+  GEN -> GEN : rédige une sortie structurée
+  GEN -> GEN : validation déterministe\n(schéma, citations, cohérence)
+
+  alt validation en échec
+    GEN -> GEN : reprise bornée
+  else validation réussie
+    GEN --> API : sortie validée
+  end
+  deactivate GEN
+end
+
+API --> UI : réponse ou section proposée
+deactivate SUP
+deactivate API
+UI --> U : affiche la réponse
+
+opt la sortie est une section de dossier
+  U -> UI : approuve, corrige ou relance
+  UI -> API : décision de revue
+  API -> GEN : enregistre la décision
+end
+
+deactivate UI
+
+@enduml

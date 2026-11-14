@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useMatch, useNavigate } from 'react-router-dom'
 import { type FormEvent, useEffect, useRef, useState } from 'react'
-import { convApi, type Conversation } from '../api/client'
+import { convApi, dossierApi, type Conversation, type Dossier } from '../api/client'
 import { useAuth } from '../auth/AuthContext'
 
 export function ConversationsLayout() {
@@ -9,6 +9,7 @@ export function ConversationsLayout() {
   const activeMatch = useMatch('/app/conversations/:id')
   const activeId = activeMatch?.params.id
   const [rows, setRows] = useState<Conversation[]>([])
+  const [dossiers, setDossiers] = useState<Dossier[]>([])
   const [error, setError] = useState<string | null>(null)
   const [menuOpen, setMenuOpen] = useState<string | null>(null)
   const [renameTarget, setRenameTarget] = useState<Conversation | null>(null)
@@ -16,6 +17,10 @@ export function ConversationsLayout() {
   const [deleteTarget, setDeleteTarget] = useState<Conversation | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [listTick, setListTick] = useState(0)
+  // '' = tous les dossiers, 'none' = conversations sans dossier (recherche
+  // libre patrimoine). Synchronisé automatiquement sur le dossier de la
+  // conversation ouverte — voir l'effet ci-dessous.
+  const [dossierFilter, setDossierFilter] = useState<string>('')
   const menuRef = useRef<HTMLDivElement>(null)
 
   function refresh() {
@@ -24,7 +29,27 @@ export function ConversationsLayout() {
 
   useEffect(() => {
     refresh()
+    dossierApi.list().then(setDossiers).catch(() => {})
   }, [])
+
+  // Ouvrir une conversation liée à un dossier recentre automatiquement la
+  // sidebar sur ce dossier — sans ça, la liste reste toujours "tout
+  // mélangé" quel que soit le projet dans lequel on travaille.
+  useEffect(() => {
+    if (!activeId) return
+    const active = rows.find((r) => r.id === activeId)
+    if (active) setDossierFilter(active.dossier_id || 'none')
+  }, [activeId, rows])
+
+  const filteredRows =
+    dossierFilter === ''
+      ? rows
+      : dossierFilter === 'none'
+        ? rows.filter((r) => !r.dossier_id)
+        : rows.filter((r) => r.dossier_id === dossierFilter)
+
+  const dossierName = (id: string | null) =>
+    id ? dossiers.find((d) => d.id === id)?.project_name || 'Sans nom' : 'Recherche libre'
 
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
@@ -102,18 +127,36 @@ export function ConversationsLayout() {
           </button>
         </div>
         {error ? <p className="form-error conv-sidebar-error">{error}</p> : null}
+        <select
+          className="select-dark conv-dossier-filter"
+          value={dossierFilter}
+          onChange={(e) => setDossierFilter(e.target.value)}
+        >
+          <option value="">Tous les dossiers</option>
+          <option value="none">Sans dossier (recherche libre)</option>
+          {dossiers.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.project_name || 'Sans nom'}
+            </option>
+          ))}
+        </select>
         <ul className="conv-sidebar-list">
-          {rows.length === 0 ? (
-            <li className="muted conv-sidebar-empty">Aucune conversation</li>
+          {filteredRows.length === 0 ? (
+            <li className="muted conv-sidebar-empty">
+              {rows.length === 0 ? 'Aucune conversation' : 'Aucune conversation pour ce dossier'}
+            </li>
           ) : (
-            rows.map((c) => (
+            filteredRows.map((c) => (
               <li key={c.id} className="conv-sidebar-item">
                 <NavLink
                   to={`/app/conversations/${c.id}`}
                   className={({ isActive }) => (isActive ? 'conv-nav active' : 'conv-nav')}
                 >
                   <strong>{c.title || 'Sans titre'}</strong>
-                  <span>{new Date(c.updated_at).toLocaleString('fr-FR')}</span>
+                  <span>
+                    {dossierFilter === '' ? `${dossierName(c.dossier_id)} · ` : ''}
+                    {new Date(c.updated_at).toLocaleString('fr-FR')}
+                  </span>
                 </NavLink>
                 <div className="conv-item-menu" ref={menuOpen === c.id ? menuRef : undefined}>
                   <button

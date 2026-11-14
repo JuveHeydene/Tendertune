@@ -12,6 +12,14 @@ x-app-build: &app-build
   # DNS du daemon Docker souvent cassé vers PyPI ; le DNS de l'hôte fonctionne.
   network: host
 
+# Image worker séparée de l'API (Dockerfile.worker) : ajoute l'extra ocr-gpu
+# (PaddleOCR + PaddlePaddle GPU + PyMuPDF) pour lire un DAO scanné — volontairement
+# absent de l'image API (poids, cudnn8 pin), seul le worker fait l'ingestion.
+x-worker-build: &worker-build
+  context: ./backend_ao
+  dockerfile: Dockerfile.worker
+  network: host
+
 x-app-env: &app-env
   DATABASE_URL: postgresql://${POSTGRES_USER:-ao_user}:${POSTGRES_PASSWORD:-ao_pass}@postgres:5432/${POSTGRES_DB:-ao_db}
   POSTGRES_HOST: postgres
@@ -159,7 +167,7 @@ services:
 
   worker:
     profiles: ["app", "dev"]
-    build: *app-build
+    build: *worker-build
     entrypoint: ["./docker-entrypoint-worker.sh"]
     env_file: .env
     environment:

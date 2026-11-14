@@ -4,13 +4,14 @@ import logging
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user
-from app.models.sql import Document, User
+from app.models.sql import Document, Dossier, User
+from app.services.audit import record_audit
 from app.services.db_client import get_session
 from app.services.purge_document import can_delete_document, purge_document
 from app.services.document_upload import store_document
@@ -47,6 +48,12 @@ class DocumentOut(BaseModel):
     created_at: datetime | None
     updated_at: datetime | None
     duplicate: bool = False
+    # {"parse": {"started_at": .., "finished_at": .., "error": ..}, "chunk": {...},
+    #  "classify": {...}, "embed": {...}, "index": {...}, "graph": {...}}
+    pipeline_stages: dict = {}
+    # Nombre de pages déjà OCRisées (reprise) — permet d'afficher une
+    # progression pendant un scan encore en cours ou interrompu.
+    ocr_pages_done: int = 0
 
 
 def _out(d: Document, *, duplicate: bool = False) -> DocumentOut:
@@ -74,6 +81,8 @@ def _out(d: Document, *, duplicate: bool = False) -> DocumentOut:
         created_at=d.created_at,
         updated_at=d.updated_at,
         duplicate=duplicate,
+        pipeline_stages=d.pipeline_stages or {},
+        ocr_pages_done=len((d.ocr_progress or {}).get("pages") or {}),
     )
 
 
@@ -110,6 +119,12 @@ async def upload_document(
     if user.role == "consultant":
         raise HTTPException(status_code=403, detail="Le consultant ne dépose pas de pièces")
 
+    dossier: Dossier | None = None
+    if doc_role in ("dao_courant", "dao_archive") and dossier_id is not None:
+        dossier = await session.get(Dossier, dossier_id)
+        if dossier is None or dossier.tenant_id != user.tenant_id:
+            raise HTTPException(status_code=404, detail="Dossier introuvable")
+
     data = await file.read()
     if not data:
         raise HTTPException(status_code=400, detail="Fichier vide")
@@ -137,6 +152,11 @@ async def upload_document(
     if duplicate:
         log.info("UPLOAD doublon id=%s statut=%s", doc.id, doc.status)
         return _out(doc, duplicate=True)
+    if dossier is not None:
+        # Lien Dossier → DAO courant : c'est le seul endroit qui l'établit —
+        # sans lui, `analyser_dossier` (extraction exigences/outline, §9) ne
+        # trouve jamais de document à lire.
+        dossier.dao_document_id = doc.id
     await session.commit()
     await session.refresh(doc)
     log.info("[2/4] Postgres INSERT FIN id=%s statut=%s sha=%s", doc.id, doc.status, doc.sha[:12])
@@ -183,9 +203,73 @@ async def promouvoir_document(
     return _out(doc)
 
 
+@router.post("/{document_id}/relancer-ingestion", response_model=DocumentOut)
+async def relancer_ingestion(
+    document_id: UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Relance l'ingestion (lecture/OCR → découpage → classification →
+    indexation) d'un document `failed`, ou resté bloqué en `processing`
+    (ex. worker interrompu). Reprend depuis la dernière page OCR déjà
+    persistée (`ocr_progress`) plutôt que de tout refaire — voir
+    app/ingest/parse.py. Les anciens vecteurs sont purgés avant réindexation
+    (app/ingest/index_qdrant.delete_by_document) : aucun résidu dupliqué."""
+    if user.role == "consultant":
+        raise HTTPException(status_code=403, detail="Action réservée au rédacteur, manager ou admin")
+    doc = await session.get(Document, document_id)
+    if doc is None or doc.tenant_id != user.tenant_id:
+        raise HTTPException(status_code=404, detail="Document introuvable")
+    if doc.status == "processing":
+        raise HTTPException(
+            status_code=409,
+            detail="Une ingestion est déjà en cours pour ce document — patientez qu'elle se termine.",
+        )
+    from app.services.queue import enqueue_ingest
+
+    doc.status = "pending"
+    doc.ingest_error = None
+    await session.commit()
+    await enqueue_ingest(str(doc.id))
+    await session.refresh(doc)
+    log.info("RELANCE ingestion demandée par %s id=%s (reprise depuis %s pages connues)",
+             user.email, doc.id, len((doc.ocr_progress or {}).get("pages") or {}))
+    return _out(doc)
+
+
+@router.post("/{document_id}/relancer-graphe", response_model=DocumentOut)
+async def relancer_graphe(
+    document_id: UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Relance UNIQUEMENT l'extraction du graphe (sans refaire le parse/
+    chunking/embeddings) — pour un document déjà `ready` dont le graphe n'a
+    jamais été extrait ou a échoué. Sûr à rejouer : écriture par MERGE sur
+    des clés canoniques (app/graph/extract.py), jamais de doublon d'entité."""
+    if user.role == "consultant":
+        raise HTTPException(status_code=403, detail="Action réservée au rédacteur, manager ou admin")
+    doc = await session.get(Document, document_id)
+    if doc is None or doc.tenant_id != user.tenant_id:
+        raise HTTPException(status_code=404, detail="Document introuvable")
+    if doc.status != "ready":
+        raise HTTPException(
+            status_code=400,
+            detail="Le document doit être entièrement ingéré (statut 'ready') avant d'extraire son graphe.",
+        )
+    if doc.graph_extracted:
+        raise HTTPException(status_code=409, detail="Le graphe est déjà extrait pour ce document.")
+    from app.services.queue import enqueue_graph
+
+    await enqueue_graph(str(doc.id))
+    log.info("RELANCE extraction graphe demandée par %s id=%s", user.email, doc.id)
+    return _out(doc)
+
+
 @router.delete("/{document_id}", status_code=204)
 async def delete_document(
     document_id: UUID,
+    request: Request,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
@@ -198,10 +282,26 @@ async def delete_document(
     if doc is None or doc.tenant_id != user.tenant_id:
         raise HTTPException(status_code=404, detail="Document introuvable")
     log.info("DELETE demandé par %s rôle=%s id=%s fichier=%s", user.email, user.role, doc.id, doc.filename)
+    details = {"filename": doc.filename, "sha": doc.sha[:16] if doc.sha else None}
     try:
+        # purge_document commite lui-même en interne (plusieurs DELETE sur
+        # Postgres/Qdrant/Neo4j/MinIO) — l'audit est donc une écriture
+        # séparée, APRÈS coup, dans les deux branches (succès ou échec).
         await purge_document(session, doc)
+        await record_audit(
+            session, tenant_id=user.tenant_id, user_id=user.id, action_type="delete",
+            resource_type="document", resource_id=document_id, details=details,
+            request=request, success=True,
+        )
+        await session.commit()
     except Exception as exc:
         await session.rollback()
+        await record_audit(
+            session, tenant_id=user.tenant_id, user_id=user.id, action_type="delete",
+            resource_type="document", resource_id=document_id, details=details,
+            request=request, success=False, error_message=str(exc),
+        )
+        await session.commit()
         log.exception("DELETE ÉCHEC id=%s : %s", document_id, exc)
         raise HTTPException(status_code=500, detail=f"Suppression incomplète : {exc}") from exc
 

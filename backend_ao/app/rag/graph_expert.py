@@ -38,7 +38,7 @@ Pas d'entité si rien de clair. Question :
 async def _extract_query_entities(query: str) -> list[dict]:
     prompt = _EXTRACT_PROMPT.format(types=", ".join(ENTITY_TYPES), query=query)
     try:
-        body = await asyncio.to_thread(ollama_generate_json, prompt, timeout=60)
+        body = await asyncio.to_thread(ollama_generate_json, prompt, timeout=60, num_ctx=2048)
     except Exception as exc:
         log.warning("graph_expert — extraction d'entités échouée : %s", exc)
         return []

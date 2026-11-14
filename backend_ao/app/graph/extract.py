@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import urllib.request
@@ -15,6 +16,7 @@ from app.config import get_settings
 from app.graph.entity_match import EntityMatchIndex, norm_name, resolve_entity_key
 from app.models.sql import ChunkRow, Document
 from app.services.db_client import session_factory
+from app.services.pipeline_stages import mark_failed_stage, mark_stage
 
 log = logging.getLogger("btp.graph")
 
@@ -54,7 +56,9 @@ def _ollama_json(text: str) -> dict:
         + text[:3500]
     )
     payload = json.dumps(
-        {"model": s.llm_model, "prompt": prompt, "stream": False, "format": "json"}
+        # num_ctx explicite (texte déjà borné à 3500 car., mais documenté
+        # plutôt que de compter implicitement sur le défaut Ollama).
+        {"model": s.llm_model, "prompt": prompt, "stream": False, "format": "json", "options": {"num_ctx": 2048}}
     ).encode()
     req = urllib.request.Request(
         f"{s.ollama_base_url.rstrip('/')}/api/generate",
@@ -146,6 +150,8 @@ async def extract_graph(ctx: dict, document_id: str) -> str:
         if doc.graph_extracted:
             log.info("GRAPH déjà extrait — rien à faire id=%s", document_id)
             return f"already:{document_id}"
+        mark_stage(doc, "graph", started=True)
+        await session.commit()
         parents = (
             await session.execute(
                 select(ChunkRow).where(
@@ -181,7 +187,12 @@ async def extract_graph(ctx: dict, document_id: str) -> str:
                     extra = dict(chunk.extra or {})
                     try:
                         log.info("GRAPH Ollama DÉBUT chunk %s/%s id=%s", i, len(to_do), chunk.id)
-                        data = _ollama_json(chunk.text)
+                        # Bloquant (urllib) — dans un thread pour ne pas geler
+                        # la boucle asyncio du worker pendant les N appels
+                        # séquentiels (un DAO de centaines de chunks parents
+                        # bloquerait sinon toute la boucle d'événements des
+                        # heures, comme observé pour la classification §3.1).
+                        data = await asyncio.to_thread(_ollama_json, chunk.text)
                         log.info(
                             "GRAPH Ollama FIN chunk %s/%s entités_brutes=%s relations_brutes=%s",
                             i,
@@ -258,6 +269,7 @@ async def extract_graph(ctx: dict, document_id: str) -> str:
                         n_rel_dropped,
                     )
             doc.graph_extracted = True
+            mark_stage(doc, "graph", finished=True)
             doc.updated_at = datetime.now(UTC)
             await session.commit()
             log.info(
@@ -269,6 +281,15 @@ async def extract_graph(ctx: dict, document_id: str) -> str:
             )
         except Exception as exc:
             log.exception("======== GRAPH ÉCHEC document_id=%s : %s ========", document_id, exc)
+            try:
+                await session.rollback()
+                doc = await session.get(Document, UUID(document_id))
+                if doc is not None:
+                    mark_failed_stage(doc, f"{type(exc).__name__}: {exc}")
+                    doc.updated_at = datetime.now(UTC)
+                    await session.commit()
+            except Exception:
+                log.exception("GRAPH — échec en enregistrant l'erreur elle-même id=%s", document_id)
             return f"graph_failed:{document_id}"
         finally:
             try:

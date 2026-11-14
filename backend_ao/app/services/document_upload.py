@@ -50,6 +50,14 @@ async def store_document(
         length=len(data),
         content_type=content_type or "application/octet-stream",
     )
+    # Une pièce administrative (KBIS, attestation, DC1/DC2...) n'a aucune
+    # valeur de recherche sémantique — c'est un justificatif à fournir tel
+    # quel, pas un texte à chunker/vectoriser. L'ingestion RAG (OCR, découpage,
+    # embeddings, Qdrant) est donc sautée : la pièce reste "ready" tout de
+    # suite, exploitable pour la checklist administrative et son export PDF
+    # (app/services/pieces_export.py), sans le coût ni le bruit de retrieval
+    # qu'apporterait l'indexation de documents rarement recherchés en RAG.
+    skip_ingest = doc_type == "administratif"
     doc = Document(
         tenant_id=user.tenant_id,
         created_by=user.id,
@@ -62,18 +70,19 @@ async def store_document(
         # V2 — doc_role="annexe" : scope live au dossier (§1.5), distinct de
         # dossier_origine_id (provenance historique d'un doc de patrimoine).
         dossier_id=dossier_id,
-        status="pending",
+        status="ready" if skip_ingest else "pending",
         filename=filename,
         size_bytes=len(data),
         mime_type=content_type,
     )
     session.add(doc)
     await session.flush()
-    try:
-        await enqueue_ingest(str(doc.id))
-    except Exception as exc:
-        err = f"{type(exc).__name__}: {exc}"
-        log.exception("store_document ARQ échec id=%s", doc.id)
-        doc.status = "failed"
-        doc.ingest_error = f"File Redis/ARQ : {err}"[:4000]
+    if not skip_ingest:
+        try:
+            await enqueue_ingest(str(doc.id))
+        except Exception as exc:
+            err = f"{type(exc).__name__}: {exc}"
+            log.exception("store_document ARQ échec id=%s", doc.id)
+            doc.status = "failed"
+            doc.ingest_error = f"File Redis/ARQ : {err}"[:4000]
     return doc, False

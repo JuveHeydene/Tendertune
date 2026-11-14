@@ -125,7 +125,6 @@ def _retrieve_dense_sync(
                             ]
                         ),
                     ],
-                    min_should=1,
                 )
             )
         else:
@@ -145,7 +144,6 @@ def _retrieve_dense_sync(
                         ]
                     ),
                 ],
-                min_should=1,
             )
         )
 
@@ -156,7 +154,6 @@ def _retrieve_dense_sync(
                     FieldCondition(key="section_type", match=MatchAny(any=section_types)),
                     IsNullCondition(is_null=PayloadField(key="section_type")),
                 ],
-                min_should=1,
             )
         )
 

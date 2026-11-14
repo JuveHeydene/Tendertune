@@ -56,6 +56,30 @@ function formatBytes(n: number | null | undefined): string {
   return `${(n / (1024 * 1024)).toFixed(1)} Mo`
 }
 
+// Ordre d'exécution réel du pipeline (app/services/pipeline_stages.py).
+const PIPELINE_PHASES: { key: string; label: string }[] = [
+  { key: 'parse', label: 'Extraction texte / OCR' },
+  { key: 'chunk', label: 'Découpage (chunking)' },
+  { key: 'classify', label: 'Classification sections' },
+  { key: 'embed', label: 'Vectorisation (embeddings)' },
+  { key: 'index', label: 'Indexation Qdrant' },
+  { key: 'graph', label: 'Extraction du graphe' },
+]
+
+function formatDuration(startIso?: string, endIso?: string): string | null {
+  if (!startIso || !endIso) return null
+  const ms = new Date(endIso).getTime() - new Date(startIso).getTime()
+  if (!Number.isFinite(ms) || ms < 0) return null
+  if (ms < 1000) return `${ms} ms`
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)} s`
+  return `${Math.round(ms / 60_000)} min`
+}
+
+function formatTime(iso?: string): string {
+  if (!iso) return ''
+  return new Date(iso).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+}
+
 export function DocumentsPage() {
   const { user } = useAuth()
   const [rows, setRows] = useState<DocItem[]>([])
@@ -72,6 +96,8 @@ export function DocumentsPage() {
   const [deleting, setDeleting] = useState<string | null>(null)
   const [filter, setFilter] = useState<'all' | 'ready' | 'live' | 'failed'>('all')
   const [tick, setTick] = useState(0)
+  const [relaunching, setRelaunching] = useState<string | null>(null)
+  const [relaunchError, setRelaunchError] = useState<string | null>(null)
 
   async function refresh(silent = false) {
     if (!silent) setLoading(true)
@@ -101,6 +127,13 @@ export function DocumentsPage() {
     }, 4000)
     return () => window.clearInterval(id)
   }, [])
+
+  useEffect(() => {
+    if (!open) return
+    const fresh = rows.find((r) => r.id === open.id)
+    if (fresh && fresh !== open) setOpen(fresh)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows])
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -157,6 +190,34 @@ export function DocumentsPage() {
       setExportsError(err instanceof Error ? err.message : 'Téléchargement impossible')
     } finally {
       setDownloading(null)
+    }
+  }
+
+  async function onRelancerIngestion(d: DocItem) {
+    setRelaunching(d.id)
+    setRelaunchError(null)
+    try {
+      const updated = await docsApi.relancerIngestion(d.id)
+      setOpen(updated)
+      await refresh(true)
+    } catch (err) {
+      setRelaunchError(err instanceof Error ? err.message : 'Relance impossible')
+    } finally {
+      setRelaunching(null)
+    }
+  }
+
+  async function onRelancerGraphe(d: DocItem) {
+    setRelaunching(d.id)
+    setRelaunchError(null)
+    try {
+      const updated = await docsApi.relancerGraphe(d.id)
+      setOpen(updated)
+      await refresh(true)
+    } catch (err) {
+      setRelaunchError(err instanceof Error ? err.message : 'Relance impossible')
+    } finally {
+      setRelaunching(null)
     }
   }
 
@@ -456,14 +517,85 @@ export function DocumentsPage() {
               {open.ocr_used ? ' · OCR' : ''}
               {open.graph_extracted ? ' · graphe Neo4j' : ''}
             </p>
-            <dl className="attr-grid attr-grid--scroll">
-              {LABELS.map(({ key, label }) => (
-                <div key={key} className="attr-row">
-                  <dt>{label}</dt>
-                  <dd>{fmt(open[key])}</dd>
-                </div>
-              ))}
-            </dl>
+
+            {canUpload ? (
+              <div className="docs-relaunch">
+                {open.status === 'failed' || open.status === 'pending' ? (
+                  <button
+                    type="button"
+                    className="btn-ghost btn-sm"
+                    disabled={relaunching === open.id}
+                    onClick={() => void onRelancerIngestion(open)}
+                    title="Reprend depuis la dernière page OCR déjà connue — purge les anciens vecteurs avant réindexation, aucun résidu dupliqué."
+                  >
+                    {relaunching === open.id ? 'Relance…' : "↻ Relancer l'ingestion"}
+                  </button>
+                ) : null}
+                {open.status === 'processing' ? (
+                  <span className="muted docs-relaunch-hint">Ingestion déjà en cours — patientez.</span>
+                ) : null}
+                {open.status === 'ready' && !open.graph_extracted ? (
+                  <button
+                    type="button"
+                    className="btn-ghost btn-sm"
+                    disabled={relaunching === open.id}
+                    onClick={() => void onRelancerGraphe(open)}
+                    title="Relance uniquement l'extraction du graphe, sans refaire le parse/chunking/embeddings."
+                  >
+                    {relaunching === open.id ? 'Relance…' : '↻ Relancer le graphe'}
+                  </button>
+                ) : null}
+                {open.ocr_pages_done ? (
+                  <span className="muted docs-relaunch-hint">
+                    {open.ocr_pages_done} page{open.ocr_pages_done > 1 ? 's' : ''} OCR déjà persistée
+                    {open.ocr_pages_done > 1 ? 's' : ''} (reprise possible).
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+            {relaunchError ? <p className="form-error">{relaunchError}</p> : null}
+
+            <div className="attr-grid--scroll">
+              <h3 className="docs-timeline-title">Phases du traitement</h3>
+              <ol className="pipeline-timeline">
+                {PIPELINE_PHASES.map(({ key, label }) => {
+                  const stage = open.pipeline_stages?.[key]
+                  const started = stage?.started_at
+                  const finished = stage?.finished_at
+                  const err = stage?.error
+                  const state = err ? 'error' : finished ? 'done' : started ? 'running' : 'pending'
+                  const duration = formatDuration(started, finished)
+                  return (
+                    <li key={key} className={`pipeline-stage pipeline-stage--${state}`}>
+                      <span className="pipeline-stage-dot" aria-hidden="true" />
+                      <div className="pipeline-stage-body">
+                        <span className="pipeline-stage-label">{label}</span>
+                        {started ? (
+                          <span className="pipeline-stage-meta muted">
+                            débuté {formatTime(started)}
+                            {finished ? ` · terminé ${formatTime(finished)}` : ' · en cours…'}
+                            {duration ? ` · ${duration}` : ''}
+                          </span>
+                        ) : (
+                          <span className="pipeline-stage-meta muted">non démarré</span>
+                        )}
+                        {err ? <span className="pipeline-stage-error">{err}</span> : null}
+                      </div>
+                    </li>
+                  )
+                })}
+              </ol>
+
+              <h3 className="docs-timeline-title">Métadonnées</h3>
+              <dl className="attr-grid">
+                {LABELS.map(({ key, label }) => (
+                  <div key={key} className="attr-row">
+                    <dt>{label}</dt>
+                    <dd>{fmt(open[key])}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
           </div>
         </div>
       ) : null}

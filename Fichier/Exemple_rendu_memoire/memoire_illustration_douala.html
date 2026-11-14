@@ -1,0 +1,2377 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Mémoire technique — Aménagement de l'accès Ouest de Douala (document d'illustration)</title>
+<style>
+  @page {
+    size: A4;
+    margin: 2.4cm 2cm 2.2cm 2cm;
+    @top-center {
+      content: string(doctitle);
+      font-family: "Liberation Sans", "DejaVu Sans", Arial, sans-serif;
+      font-size: 8.5pt;
+      color: #8a93a1;
+      letter-spacing: .03em;
+    }
+    @bottom-left {
+      content: "Document d'illustration — données fictives";
+      font-family: "Liberation Sans", "DejaVu Sans", Arial, sans-serif;
+      font-size: 7.5pt;
+      color: #a8b0bb;
+    }
+    @bottom-center {
+      content: "Page " counter(page) " / " counter(pages);
+      font-family: "Liberation Sans", "DejaVu Sans", Arial, sans-serif;
+      font-size: 8.5pt;
+      color: #8a93a1;
+    }
+    @bottom-right {
+      content: "ALPHA TP CAMEROUN SA";
+      font-family: "Liberation Sans", "DejaVu Sans", Arial, sans-serif;
+      font-size: 7.5pt;
+      color: #a8b0bb;
+    }
+  }
+  @page cover {
+    margin: 0;
+    @top-center { content: none; }
+    @bottom-left { content: none; }
+    @bottom-center { content: none; }
+    @bottom-right { content: none; }
+  }
+  @page toc { @top-center { content: none; } }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Liberation Sans", "DejaVu Sans", Arial, sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.55;
+    color: #22282f;
+  }
+
+  /* ---------- Couverture ---------- */
+  .cover {
+    page: cover;
+    page-break-after: always;
+    height: 297mm;
+    position: relative;
+    background: linear-gradient(150deg, #10233d 0%, #16324f 55%, #1c3d5a 100%);
+    color: #fff;
+  }
+  .cover .accent-bar {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 14px;
+    background: #e08e2b;
+  }
+  .cover .cover-inner { position: absolute; left: 3cm; right: 2.4cm; top: 4.6cm; }
+  .cover .kicker {
+    text-transform: uppercase;
+    letter-spacing: .18em;
+    font-size: 10pt;
+    color: #e08e2b;
+    font-weight: 700;
+    margin-bottom: 0.8cm;
+  }
+  .cover h1 { font-size: 27pt; line-height: 1.25; margin: 0 0 0.5cm 0; font-weight: 700; }
+  .cover .subtitle { font-size: 12.5pt; color: #c9d4e0; margin-bottom: 1.1cm; }
+  .cover .illus-badge {
+    border: 1px solid #e08e2b;
+    border-left: 5px solid #e08e2b;
+    background: rgba(224,142,43,.10);
+    padding: 0.42cm 0.6cm;
+    margin-bottom: 1.6cm;
+    font-size: 9.5pt;
+    line-height: 1.5;
+    color: #f3e2cb;
+  }
+  .cover .illus-badge b { color: #f6b662; display: block; margin-bottom: 0.12cm; letter-spacing: .04em; }
+  .cover .meta-table {
+    border-top: 1px solid rgba(255,255,255,.25);
+    padding-top: 0.5cm;
+    font-size: 10pt;
+    color: #dbe3ec;
+  }
+  .cover .meta-table div { margin-bottom: 0.22cm; }
+  .cover .meta-table b { color: #fff; font-weight: 700; }
+  .cover .footer-brand {
+    position: absolute;
+    left: 3cm; bottom: 1.8cm;
+    font-size: 9pt;
+    color: #8fa2b8;
+    letter-spacing: .05em;
+  }
+
+  /* ---------- Note liminaire ---------- */
+  .prelim { page-break-after: always; }
+  .prelim h1 {
+    string-set: doctitle content();
+    font-size: 16pt; color: #1c3d5a;
+    border-bottom: 2px solid #e08e2b;
+    padding-bottom: 0.25cm; margin: 0 0 0.6cm 0;
+  }
+  .warn-box {
+    border-left: 4px solid #e08e2b;
+    background: #fdf5e9;
+    padding: 0.45cm 0.6cm;
+    margin: 0.4cm 0 0.6cm 0;
+    font-size: 10pt;
+    color: #5c4a26;
+  }
+  .warn-box strong { color: #a9660c; }
+
+  /* ---------- Sommaire ---------- */
+  .toc { page: toc; page-break-after: always; }
+  .toc h2 {
+    font-size: 18pt; color: #1c3d5a;
+    border-bottom: 2px solid #e08e2b;
+    padding-bottom: 0.28cm; margin: 0 0 0.45cm 0;
+  }
+  .toc ul { list-style: none; margin: 0; padding: 0; }
+  .toc li { display: flex; align-items: baseline; padding: 0.13cm 0; font-size: 10.5pt; }
+  .toc li.lvl1 { font-weight: 700; color: #1c3d5a; padding-top: 0.20cm; }
+  .toc li.lvl2 { font-size: 9.5pt; color: #4a5866; padding-left: 1.35cm; padding-top: 0.06cm; padding-bottom: 0.06cm; }
+  .toc .num { color: #e08e2b; font-weight: 700; width: 1.35cm; flex: none; }
+  .toc li.lvl2 .num { color: #9aa7b4; width: 1.15cm; font-weight: 400; }
+  .toc a { text-decoration: none; color: inherit; }
+  .toc .dots { flex: 1; border-bottom: 1px dotted #c8d2dc; margin: 0 0.18cm; position: relative; top: -0.12cm; }
+  .toc .pg { flex: none; color: #6a7684; font-size: 9.5pt; }
+  .toc .pg::after { content: target-counter(attr(href), page); }
+
+  /* ---------- Chapitres ---------- */
+  .chapter { page-break-before: always; }
+  .chapter h1 {
+    string-set: doctitle content();
+    font-size: 16pt; color: #1c3d5a;
+    border-bottom: 2px solid #e08e2b;
+    padding-bottom: 0.25cm; margin: 0 0 0.55cm 0;
+  }
+  .chapter h1 .cnum { color: #e08e2b; margin-right: 0.35cm; }
+  h2 {
+    font-size: 12.5pt; color: #1c3d5a;
+    margin: 0.65cm 0 0.25cm 0;
+    page-break-after: avoid;
+  }
+  h3 {
+    font-size: 11pt; color: #3a556f;
+    margin: 0.5cm 0 0.2cm 0;
+    page-break-after: avoid;
+  }
+  p { margin: 0 0 0.32cm 0; text-align: justify; }
+  ul, ol { margin: 0 0 0.38cm 0; padding-left: 0.62cm; }
+  li { margin-bottom: 0.11cm; text-align: justify; }
+  .lead {
+    font-size: 11pt; color: #33465c;
+    border-left: 3px solid #cbd6e2;
+    padding-left: 0.5cm;
+    margin-bottom: 0.5cm;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0.3cm 0 0.55cm 0;
+    font-size: 9pt;
+    page-break-inside: avoid;
+  }
+  table.long { page-break-inside: auto; }
+  table.long tr { page-break-inside: avoid; }
+  th {
+    background: #1c3d5a; color: #fff;
+    text-align: left; padding: 0.18cm 0.26cm;
+    font-size: 8.8pt; line-height: 1.35;
+  }
+  td { padding: 0.16cm 0.26cm; border-bottom: 1px solid #e3e8ee; vertical-align: top; line-height: 1.4; }
+  tr:nth-child(even) td { background: #f4f7fa; }
+  td.num, th.num { text-align: right; white-space: nowrap; }
+  caption {
+    caption-side: top; text-align: left;
+    font-size: 8.8pt; color: #6a7684;
+    padding-bottom: 0.12cm; font-style: italic;
+  }
+
+  .callout {
+    border-left: 3px solid #1c3d5a;
+    background: #f2f6fa;
+    padding: 0.32cm 0.5cm;
+    margin: 0.35cm 0 0.5cm 0;
+    font-size: 9.6pt;
+    page-break-inside: avoid;
+  }
+  .callout b { color: #1c3d5a; }
+  .fiche {
+    border: 1px solid #d7dee6;
+    border-top: 3px solid #1c3d5a;
+    padding: 0.4cm 0.5cm 0.25cm 0.5cm;
+    margin: 0.35cm 0 0.55cm 0;
+    page-break-inside: avoid;
+  }
+  .fiche h3 { margin-top: 0; color: #1c3d5a; font-size: 11pt; }
+  .fiche table { margin: 0.2cm 0 0.25cm 0; font-size: 8.8pt; }
+  .fiche table td { border-bottom: 1px solid #edf1f5; }
+  .fiche table td:first-child { color: #61707f; width: 4.6cm; }
+  .fiche tr:nth-child(even) td { background: transparent; }
+
+  .schema {
+    border: 1px solid #d7dee6;
+    background: #fafcfe;
+    padding: 0.4cm 0.5cm;
+    margin: 0.35cm 0 0.55cm 0;
+    font-family: "DejaVu Sans Mono", monospace;
+    font-size: 8pt;
+    line-height: 1.45;
+    white-space: pre;
+    color: #2c3a49;
+    page-break-inside: avoid;
+  }
+  .sig { font-size: 9.5pt; color: #61707f; margin-top: 0.7cm; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="accent-bar"></div>
+  <div class="cover-inner">
+    <div class="kicker">Mémoire technique — Appel d'offres</div>
+    <h1>TRAVAUX D'AMÉNAGEMENT DE L'ACCÈS OUEST DE LA VILLE DE DOUALA</h1>
+    <div class="subtitle">Réponse technique et méthodologique — RN3, section Bonabéri / PK 12+400</div>
+    <div class="illus-badge">
+      <b>DOCUMENT D'ILLUSTRATION</b>
+      Exemple de rendu cible destiné à illustrer la structure et la mise en forme
+      attendues d'un mémoire technique. Ce document n'a pas été produit par la
+      plateforme&nbsp;: il a été rédigé manuellement. L'entreprise, les références,
+      les personnes et l'ensemble des données chiffrées qui y figurent sont fictives.
+    </div>
+    <div class="meta-table">
+      <div><b>Maître d'ouvrage</b> — Communauté urbaine de Douala <i>(cadre fictif)</i></div>
+      <div><b>Candidat</b> — ALPHA TP CAMEROUN SA <i>(entreprise fictive)</i></div>
+      <div><b>Objet</b> — Aménagement en 2×2 voies, assainissement et équipements</div>
+      <div><b>Délai d'exécution proposé</b> — 24 mois</div>
+      <div><b>Date</b> — Septembre 2026</div>
+    </div>
+  </div>
+  <div class="footer-brand">Document d'illustration — exemple de rendu cible</div>
+</div>
+
+<div class="prelim">
+  <h1>Note liminaire</h1>
+  <div class="warn-box">
+    <strong>Nature et statut de ce document.</strong> Le présent mémoire technique est un
+    <strong>document d'illustration</strong>. Il a été rédigé manuellement afin de montrer la
+    structure, le niveau de détail et la mise en forme visés pour un mémoire technique de
+    réponse à appel d'offres en travaux routiers urbains. Il <strong>n'est pas une sortie de la
+    plateforme de génération</strong> et ne doit pas être présenté comme telle. Aucune des
+    informations qu'il contient n'est réelle&nbsp;: l'entreprise candidate, son encadrement, ses
+    références, son parc matériel, ses certifications et l'ensemble des données chiffrées
+    sont fictifs et n'engagent aucune personne ni aucune société existante.
+  </div>
+  <h2>Objet du document</h2>
+  <p>
+    Ce document répond, dans sa forme, aux attentes usuelles d'un maître d'ouvrage pour un
+    marché de travaux d'aménagement routier en milieu urbain&nbsp;: présentation du candidat,
+    démonstration de la compréhension du projet et de ses contraintes, justification des
+    moyens humains et matériels affectés, exposé détaillé de la méthodologie d'exécution,
+    planning et maîtrise des délais, dispositif qualité, dispositif de sécurité et
+    engagements environnementaux et sociaux.
+  </p>
+  <h2>Cadre du projet retenu pour l'illustration</h2>
+  <p>
+    Le scénario retenu est celui de l'aménagement de l'accès Ouest de la ville de Douala,
+    sur la route nationale n°&nbsp;3, entre le carrefour de Bonabéri et le point kilométrique
+    12+400, soit un linéaire de <b>12,4&nbsp;km</b>. Il s'agit d'un axe de desserte portuaire et
+    interurbaine, fortement circulé, traversant un tissu urbain dense, soumis à une
+    pluviométrie annuelle élevée et à des sols majoritairement hydromorphes. Ces
+    caractéristiques permettent d'illustrer l'ensemble des volets techniques qu'un mémoire
+    complet doit traiter&nbsp;: terrassements en sols compressibles, assainissement dimensionnant,
+    travaux sous circulation, interfaces avec les concessionnaires de réseaux et gestion des
+    riverains.
+  </p>
+  <h2>Mode de lecture</h2>
+  <p>
+    Les quatorze chapitres qui suivent sont autonomes et peuvent être lus séparément. Les
+    tableaux, fiches de référence, plans d'essais et matrices de risques ont volontairement
+    été renseignés jusqu'au niveau de détail qu'exigerait un dossier réel, afin de donner une
+    mesure réaliste du volume et de la densité d'un mémoire technique de cette nature.
+  </p>
+</div>
+
+<div class="toc">
+  <h2>Sommaire</h2>
+  <ul>
+    <li class="lvl1"><span class="num">01</span><a href="#ch01">Présentation de l'entreprise</a><span class="dots"></span><a class="pg" href="#ch01"></a></li>
+    <li class="lvl2"><span class="num">1.1</span><a href="#ch01">Identité et repères</a><span class="dots"></span><a class="pg" href="#ch01"></a></li>
+    <li class="lvl2"><span class="num">1.5</span><a href="#s15">Certifications, qualifications et agréments</a><span class="dots"></span><a class="pg" href="#s15"></a></li>
+    <li class="lvl1"><span class="num">02</span><a href="#ch02">Compréhension du projet et analyse du contexte</a><span class="dots"></span><a class="pg" href="#ch02"></a></li>
+    <li class="lvl2"><span class="num">2.3</span><a href="#s23">Contexte climatique et hydrologique</a><span class="dots"></span><a class="pg" href="#s23"></a></li>
+    <li class="lvl2"><span class="num">2.7</span><a href="#s27">Analyse des risques du projet</a><span class="dots"></span><a class="pg" href="#s27"></a></li>
+    <li class="lvl1"><span class="num">03</span><a href="#ch03">Références et expériences similaires</a><span class="dots"></span><a class="pg" href="#ch03"></a></li>
+    <li class="lvl1"><span class="num">04</span><a href="#ch04">Moyens humains</a><span class="dots"></span><a class="pg" href="#ch04"></a></li>
+    <li class="lvl2"><span class="num">4.3</span><a href="#s43">Encadrement affecté au projet</a><span class="dots"></span><a class="pg" href="#s43"></a></li>
+    <li class="lvl1"><span class="num">05</span><a href="#ch05">Moyens matériels</a><span class="dots"></span><a class="pg" href="#ch05"></a></li>
+    <li class="lvl1"><span class="num">06</span><a href="#ch06">Méthodologie générale d'exécution</a><span class="dots"></span><a class="pg" href="#ch06"></a></li>
+    <li class="lvl2"><span class="num">6.5</span><a href="#s65">Terrassements</a><span class="dots"></span><a class="pg" href="#s65"></a></li>
+    <li class="lvl2"><span class="num">6.6</span><a href="#s66">Assainissement et drainage</a><span class="dots"></span><a class="pg" href="#s66"></a></li>
+    <li class="lvl2"><span class="num">6.8</span><a href="#s68">Couches de chaussée</a><span class="dots"></span><a class="pg" href="#s68"></a></li>
+    <li class="lvl1"><span class="num">07</span><a href="#ch07">Organisation du chantier et gestion des interfaces</a><span class="dots"></span><a class="pg" href="#ch07"></a></li>
+    <li class="lvl1"><span class="num">08</span><a href="#ch08">Planning et maîtrise des délais</a><span class="dots"></span><a class="pg" href="#ch08"></a></li>
+    <li class="lvl1"><span class="num">09</span><a href="#ch09">Plan d'assurance qualité</a><span class="dots"></span><a class="pg" href="#ch09"></a></li>
+    <li class="lvl1"><span class="num">10</span><a href="#ch10">Hygiène, sécurité et protection de la santé</a><span class="dots"></span><a class="pg" href="#ch10"></a></li>
+    <li class="lvl1"><span class="num">11</span><a href="#ch11">Management environnemental et social</a><span class="dots"></span><a class="pg" href="#ch11"></a></li>
+    <li class="lvl1"><span class="num">12</span><a href="#ch12">Gestion documentaire, reporting et communication</a><span class="dots"></span><a class="pg" href="#ch12"></a></li>
+    <li class="lvl1"><span class="num">13</span><a href="#ch13">Garantie, entretien et fin de chantier</a><span class="dots"></span><a class="pg" href="#ch13"></a></li>
+    <li class="lvl1"><span class="num">14</span><a href="#ch14">Annexes au mémoire technique</a><span class="dots"></span><a class="pg" href="#ch14"></a></li>
+  </ul>
+</div>
+<div class="chapter" id="ch01">
+  <h1><span class="cnum">1.</span> Présentation de l'entreprise</h1>
+
+  <p class="lead">
+    ALPHA TP CAMEROUN SA est une entreprise générale de travaux publics implantée à Douala
+    depuis 1998, spécialisée dans la construction et la réhabilitation d'infrastructures
+    routières, l'assainissement urbain et les ouvrages d'art courants. Elle intervient
+    principalement sur le corridor Douala–Yaoundé–Bafoussam et dans les agglomérations du
+    Littoral, de l'Ouest et du Centre.
+  </p>
+
+  <h2>1.1 Identité et repères</h2>
+  <table>
+    <caption>Tableau 1.1 — Fiche d'identité de l'entreprise</caption>
+    <tr><td style="width:6cm;color:#61707f">Raison sociale</td><td>ALPHA TP CAMEROUN SA</td></tr>
+    <tr><td style="color:#61707f">Forme juridique</td><td>Société anonyme avec conseil d'administration</td></tr>
+    <tr><td style="color:#61707f">Capital social</td><td>2 400 000 000 FCFA entièrement libéré</td></tr>
+    <tr><td style="color:#61707f">Année de création</td><td>1998</td></tr>
+    <tr><td style="color:#61707f">Siège social</td><td>Zone industrielle de Bonabéri, BP 4127, Douala</td></tr>
+    <tr><td style="color:#61707f">Agences</td><td>Douala (siège), Yaoundé (Nsam), Bafoussam (Banengo)</td></tr>
+    <tr><td style="color:#61707f">Effectif permanent</td><td>624 collaborateurs au 30 juin 2026</td></tr>
+    <tr><td style="color:#61707f">Effectif moyen en pointe</td><td>1 180 personnes (personnel temporaire inclus)</td></tr>
+    <tr><td style="color:#61707f">Chiffre d'affaires moyen (3 ans)</td><td>28,6 milliards FCFA</td></tr>
+    <tr><td style="color:#61707f">Domaines d'activité</td><td>Routes et VRD, assainissement, ouvrages d'art courants, terrassements généraux, aménagements urbains</td></tr>
+  </table>
+
+  <h2>1.2 Trajectoire et domaines d'intervention</h2>
+  <p>
+    Créée en 1998 comme entreprise de terrassement au service des zones industrielles de
+    Bonabéri, ALPHA TP CAMEROUN a progressivement élargi son périmètre technique&nbsp;: voirie
+    urbaine à partir de 2003, assainissement structurant à partir de 2008, puis ouvrages
+    hydrauliques et ouvrages d'art courants à partir de 2013. Cette progression s'est
+    accompagnée d'une internalisation des compétences critiques — topographie, laboratoire
+    géotechnique, production d'enrobés, maintenance du parc — qui constitue aujourd'hui
+    l'ossature de sa capacité de production.
+  </p>
+  <p>
+    L'entreprise a réalisé au cours des dix dernières années plus de 240&nbsp;km de chaussées
+    neuves ou renforcées, 96&nbsp;km de réseaux d'assainissement urbain et 41 ouvrages
+    hydrauliques. Elle est structurée pour conduire simultanément trois à quatre chantiers
+    d'envergure, chacun doté d'une équipe d'encadrement dédiée et autonome, adossée à des
+    directions fonctionnelles centralisées.
+  </p>
+
+  <h3>Répartition indicative de l'activité</h3>
+  <table>
+    <caption>Tableau 1.2 — Répartition du chiffre d'affaires par domaine (moyenne 2023-2025)</caption>
+    <tr><th>Domaine d'activité</th><th class="num">Part du CA</th><th>Illustration</th></tr>
+    <tr><td>Routes neuves et renforcement</td><td class="num">46 %</td><td>Chaussées souples, rechargements, reprofilages</td></tr>
+    <tr><td>Voirie urbaine et VRD</td><td class="num">21 %</td><td>Traversées d'agglomération, contre-allées, trottoirs</td></tr>
+    <tr><td>Assainissement et drainage</td><td class="num">18 %</td><td>Caniveaux, collecteurs, exutoires, bassins</td></tr>
+    <tr><td>Ouvrages d'art courants</td><td class="num">9 %</td><td>Dalots, buses, passerelles, murs de soutènement</td></tr>
+    <tr><td>Terrassements généraux et plateformes</td><td class="num">6 %</td><td>Plateformes industrielles et logistiques</td></tr>
+  </table>
+
+  <h2>1.3 Organisation générale</h2>
+  <p>
+    L'organisation repose sur une séparation nette entre les <b>directions fonctionnelles</b>,
+    garantes des méthodes, des ressources et du contrôle, et les <b>équipes de projet</b>,
+    responsables de la production et de l'atteinte des objectifs contractuels. Cette
+    séparation permet d'affecter à chaque chantier une équipe dédiée sans fragiliser les
+    fonctions support, et assure qu'un contrôle qualité indépendant de la production soit
+    exercé sur chaque opération.
+  </p>
+  <div class="schema">DIRECTION GÉNÉRALE
+   │
+   ├── Direction Technique et Méthodes ........ études d'exécution, méthodes, métrés
+   ├── Direction des Travaux .................. pilotage des chantiers, moyens de production
+   │      ├── Chantier A — Accès Ouest Douala  (objet du présent mémoire)
+   │      ├── Chantier B
+   │      └── Chantier C
+   ├── Direction Qualité-Sécurité-Environnement ... PAQ, PPSPS, PGES, audits internes
+   │      └── Laboratoire géotechnique et routier (contrôle intérieur)
+   ├── Direction du Matériel ................... parc, maintenance, approvisionnements
+   ├── Direction Administrative et Financière .. marchés, trésorerie, assurances
+   └── Direction des Ressources Humaines ....... recrutement, formation, relations sociales</div>
+  <p>
+    La Direction Qualité-Sécurité-Environnement est rattachée directement à la Direction
+    générale et n'a aucun lien hiérarchique avec la Direction des travaux. Cette
+    indépendance est une exigence interne&nbsp;: elle garantit qu'un point d'arrêt levé par le
+    laboratoire ne puisse jamais l'être sous la pression du planning de production.
+  </p>
+
+  <h2>1.4 Capacités financières et garanties</h2>
+  <p>
+    L'entreprise dispose de lignes de crédit confirmées auprès de trois établissements
+    bancaires de la place, mobilisables pour le préfinancement des travaux, la constitution
+    des cautionnements et l'acquisition de matériel. Les états financiers des trois derniers
+    exercices sont certifiés sans réserve et joints au dossier de candidature.
+  </p>
+  <table>
+    <caption>Tableau 1.3 — Capacités financières (données fictives)</caption>
+    <tr><th>Indicateur</th><th class="num">2023</th><th class="num">2024</th><th class="num">2025</th></tr>
+    <tr><td>Chiffre d'affaires (M FCFA)</td><td class="num">25 100</td><td class="num">28 400</td><td class="num">32 300</td></tr>
+    <tr><td>Capacité d'autofinancement (M FCFA)</td><td class="num">2 310</td><td class="num">2 760</td><td class="num">3 180</td></tr>
+    <tr><td>Fonds propres (M FCFA)</td><td class="num">9 640</td><td class="num">11 200</td><td class="num">13 050</td></tr>
+    <tr><td>Lignes de crédit confirmées (M FCFA)</td><td class="num">6 000</td><td class="num">7 500</td><td class="num">7 500</td></tr>
+    <tr><td>Capacité de cautionnement disponible (M FCFA)</td><td class="num">4 200</td><td class="num">5 100</td><td class="num">5 600</td></tr>
+  </table>
+  <p>
+    Les assurances suivantes sont souscrites et maintenues pendant toute la durée du
+    marché&nbsp;: responsabilité civile professionnelle et d'exploitation, responsabilité
+    civile décennale, tous risques chantier, assurance du parc matériel et assurance
+    du personnel contre les accidents du travail.
+  </p>
+
+  <h2 id="s15">1.5 Certifications, qualifications et agréments</h2>
+  <table>
+    <caption>Tableau 1.4 — Certifications et qualifications détenues (données fictives)</caption>
+    <tr><th>Référentiel</th><th>Portée</th><th>Validité</th></tr>
+    <tr><td>ISO 9001:2015</td><td>Management de la qualité — travaux routiers, VRD, ouvrages courants</td><td>2024 – 2027</td></tr>
+    <tr><td>ISO 14001:2015</td><td>Management environnemental — chantiers et installations fixes</td><td>2024 – 2027</td></tr>
+    <tr><td>ISO 45001:2018</td><td>Santé et sécurité au travail</td><td>2025 – 2028</td></tr>
+    <tr><td>Agrément travaux routiers catégorie A</td><td>Marchés de travaux routiers sans limitation de montant</td><td>Renouvelé 2026</td></tr>
+    <tr><td>Agrément assainissement catégorie B</td><td>Réseaux et ouvrages d'assainissement urbain</td><td>Renouvelé 2025</td></tr>
+    <tr><td>Accréditation laboratoire (contrôle intérieur)</td><td>Essais sols, granulats, bétons et enrobés</td><td>2025 – 2028</td></tr>
+  </table>
+  <div class="callout">
+    <b>Ce que cela change pour le présent marché.</b> Les trois certifications de système
+    imposent des dispositions déjà rodées et directement transposables au chantier&nbsp;: un plan
+    d'assurance qualité par opération (chapitre 9), une analyse des risques sécurité tenue à
+    jour (chapitre 10) et un plan de gestion environnementale et sociale de chantier
+    (chapitre 11). Ces documents ne sont pas créés pour la circonstance&nbsp;: ils sont déclinés
+    d'un socle méthodologique éprouvé sur les opérations antérieures.
+  </div>
+
+  <h2>1.6 Politique qualité, sécurité et environnement</h2>
+  <p>
+    La politique QSE de l'entreprise repose sur quatre engagements, déclinés en objectifs
+    mesurables et revus annuellement en revue de direction&nbsp;:
+  </p>
+  <ul>
+    <li><b>Conformité technique sans reprise</b> — viser un taux de non-conformité à la
+      réception inférieur à 2 % des points contrôlés, par un contrôle intérieur exercé en
+      amont plutôt qu'un contrôle de constat en aval.</li>
+    <li><b>Sécurité des personnes</b> — objectif de zéro accident grave, avec un taux de
+      fréquence des accidents avec arrêt maintenu sous 8 et un accueil sécurité
+      systématique de tout entrant sur le chantier, y compris les sous-traitants.</li>
+    <li><b>Maîtrise des impacts environnementaux</b> — aucun rejet non traité au milieu
+      naturel, traçabilité complète des déchets, remise en état systématique des emprunts
+      et des installations.</li>
+    <li><b>Ancrage local</b> — priorité au recrutement et à la sous-traitance de proximité,
+      avec un objectif de 70 % de main-d'œuvre non qualifiée recrutée dans les quartiers
+      riverains du chantier.</li>
+  </ul>
+
+  <h2>1.7 Ancrage local et engagement sociétal</h2>
+  <p>
+    L'implantation historique de l'entreprise à Bonabéri, à l'entrée même de la zone
+    concernée par le présent marché, constitue un atout opérationnel direct&nbsp;: la base
+    logistique principale, l'atelier de maintenance et le laboratoire sont situés à moins de
+    six kilomètres de l'extrémité du chantier. Les rotations de matériel, les
+    approvisionnements et les interventions de maintenance s'en trouvent considérablement
+    raccourcis, ce qui réduit à la fois les délais d'intervention et l'empreinte des
+    déplacements.
+  </p>
+  <p>
+    Cet ancrage se traduit également par une connaissance fine du tissu riverain&nbsp;: réseaux
+    d'acteurs locaux, pratiques commerciales informelles le long des emprises, points de
+    congestion récurrents, usages piétons. Cette connaissance est déterminante pour un
+    chantier réalisé sous circulation en milieu urbain dense, où l'acceptabilité sociale
+    conditionne autant l'avancement que les moyens techniques mis en œuvre.
+  </p>
+</div>
+<div class="chapter" id="ch02">
+  <h1><span class="cnum">2.</span> Compréhension du projet et analyse du contexte</h1>
+
+  <p class="lead">
+    Ce chapitre expose la lecture que fait l'entreprise du projet, des contraintes qui le
+    caractérisent et des risques qu'il porte. Il ne reformule pas le cahier des charges&nbsp;: il
+    explicite les conséquences opérationnelles que le candidat en tire et les partis pris
+    techniques qui en découlent, développés aux chapitres 6 à 8.
+  </p>
+
+  <h2>2.1 Objet du marché et périmètre retenu</h2>
+  <p>
+    Le marché porte sur l'aménagement de l'accès Ouest de la ville de Douala, sur la route
+    nationale n°&nbsp;3, entre le carrefour de Bonabéri (PK 0+000) et le PK 12+400, soit un
+    linéaire de 12,4&nbsp;km. L'opération consiste à transformer une chaussée bidirectionnelle
+    dégradée, dépourvue d'assainissement continu, en un axe urbain structurant à 2×2 voies,
+    assaini, éclairé et sécurisé pour les usagers piétons.
+  </p>
+  <table>
+    <caption>Tableau 2.1 — Consistance des travaux (quantités indicatives)</caption>
+    <tr><th>Nature des travaux</th><th class="num">Quantité</th><th>Observations</th></tr>
+    <tr><td>Chaussée neuve 2×2 voies</td><td class="num">12,4 km</td><td>2 × 7,00 m + terre-plein central 2,00 m</td></tr>
+    <tr><td>Contre-allées de desserte riveraine</td><td class="num">3,2 km</td><td>Traversées urbaines denses (PK 1+800 à 5+000)</td></tr>
+    <tr><td>Décapage et terrassements</td><td class="num">318 000 m³</td><td>Dont 74 000 m³ de purges en sols compressibles</td></tr>
+    <tr><td>Couche de forme</td><td class="num">148 000 m³</td><td>Matériaux sélectionnés d'emprunt, épaisseur 0,40 m</td></tr>
+    <tr><td>Fondation en grave non traitée 0/31,5</td><td class="num">62 000 m³</td><td>Épaisseur 0,25 m après compactage</td></tr>
+    <tr><td>Base en grave-bitume GB3</td><td class="num">29 800 t</td><td>Épaisseur 0,12 m</td></tr>
+    <tr><td>Couche de roulement BBME 0/10</td><td class="num">14 900 t</td><td>Épaisseur 0,06 m</td></tr>
+    <tr><td>Caniveaux en béton armé couverts</td><td class="num">18,6 km</td><td>Sections 60×70 à 120×120 cm</td></tr>
+    <tr><td>Dalots cadres en béton armé</td><td class="num">6 unités</td><td>De 2,00×1,50 m à 3,00×2,50 m, simples et doubles</td></tr>
+    <tr><td>Exutoires aménagés</td><td class="num">24 unités</td><td>Avec dissipateurs d'énergie et protection de berge</td></tr>
+    <tr><td>Bordures et caniveaux préfabriqués</td><td class="num">31 200 ml</td><td>Bordures T2, CS1 et A2 selon situation</td></tr>
+    <tr><td>Trottoirs et cheminements piétons</td><td class="num">54 800 m²</td><td>Pavés autobloquants, avec abaissements PMR</td></tr>
+    <tr><td>Passerelles piétonnes</td><td class="num">2 unités</td><td>Franchissements en zones d'équipements publics</td></tr>
+    <tr><td>Éclairage public</td><td class="num">412 points</td><td>Candélabres LED sur terre-plein et trottoirs</td></tr>
+    <tr><td>Signalisation horizontale</td><td class="num">86 500 m²</td><td>Produits rétroréfléchissants</td></tr>
+    <tr><td>Glissières de sécurité</td><td class="num">4 200 ml</td><td>Sections en remblai et abords d'ouvrages</td></tr>
+  </table>
+
+  <h2>2.2 Fonctionnement actuel de l'axe et enjeux</h2>
+  <p>
+    L'accès Ouest constitue l'unique liaison routière entre l'agglomération de Douala et les
+    régions du Littoral nord, de l'Ouest et du Nord-Ouest. Il cumule trois fonctions
+    difficilement compatibles sur une seule plateforme&nbsp;: un trafic de transit interurbain,
+    un trafic lourd de desserte portuaire et industrielle, et une desserte locale intense
+    entre des quartiers résidentiels et commerciaux riverains.
+  </p>
+  <table>
+    <caption>Tableau 2.2 — Caractéristiques de trafic retenues (données fictives)</caption>
+    <tr><th>Paramètre</th><th class="num">Valeur</th><th>Conséquence pour l'exécution</th></tr>
+    <tr><td>Trafic moyen journalier annuel</td><td class="num">28 400 véh/j</td><td>Impossibilité de fermeture totale de l'axe</td></tr>
+    <tr><td>Part de poids lourds</td><td class="num">22 %</td><td>Classe de trafic élevée, structure dimensionnée en conséquence</td></tr>
+    <tr><td>Croissance annuelle estimée</td><td class="num">4,8 %</td><td>Dimensionnement à 20 ans</td></tr>
+    <tr><td>Heure de pointe du matin</td><td class="num">6h00 – 9h00</td><td>Aucune opération de bascule de circulation sur ce créneau</td></tr>
+    <tr><td>Heure de pointe du soir</td><td class="num">16h30 – 20h00</td><td>Idem&nbsp;; livraisons lourdes proscrites</td></tr>
+    <tr><td>Créneau favorable aux basculements</td><td class="num">22h00 – 5h00</td><td>Travaux de nuit encadrés pour les phases critiques</td></tr>
+  </table>
+  <p>
+    La conséquence directe de ces données est que <b>le chantier ne peut pas être conduit
+    linéairement</b>&nbsp;: il doit être fractionné en sections courtes, traitées en demi-chaussée
+    ou sous déviation provisoire, avec restitution rapide à la circulation. Cette contrainte
+    structure l'ensemble de la méthodologie exposée au chapitre 6 et le phasage du chapitre 8.
+  </p>
+
+  <h2 id="s23">2.3 Contexte climatique et hydrologique</h2>
+  <p>
+    Douala est soumise à un climat équatorial de mousson caractérisé par une pluviométrie
+    annuelle de l'ordre de 3 900&nbsp;mm répartie sur près de 200 jours de pluie. La période de
+    juillet à octobre concentre à elle seule plus de la moitié des précipitations annuelles,
+    avec des épisodes orageux d'intensité élevée. Le relief est quasi nul sur la majeure
+    partie du tracé, ce qui limite les pentes disponibles pour l'évacuation gravitaire des
+    eaux et rend le réseau d'assainissement particulièrement sensible à toute erreur de
+    calage altimétrique.
+  </p>
+  <table>
+    <caption>Tableau 2.3 — Répartition pluviométrique retenue pour la planification</caption>
+    <tr><th>Période</th><th class="num">Pluviométrie</th><th class="num">Jours de pluie</th><th>Régime de travail applicable</th></tr>
+    <tr><td>Décembre – février</td><td class="num">Faible</td><td class="num">20 à 30</td><td>Plein régime, y compris terrassements et enrobés</td></tr>
+    <tr><td>Mars – mai</td><td class="num">Moyenne</td><td class="num">45 à 55</td><td>Régime normal, enrobés soumis à fenêtre météo</td></tr>
+    <tr><td>Juin</td><td class="num">Forte</td><td class="num">20 à 25</td><td>Terrassements ralentis, priorité assainissement</td></tr>
+    <tr><td>Juillet – octobre</td><td class="num">Très forte</td><td class="num">85 à 100</td><td>Terrassements suspendus, ouvrages et préfabrication</td></tr>
+    <tr><td>Novembre</td><td class="num">Moyenne</td><td class="num">15 à 20</td><td>Reprise progressive des terrassements</td></tr>
+  </table>
+  <div class="callout">
+    <b>Parti pris qui en découle.</b> La saison des pluies n'est pas traitée comme un aléa
+    subi mais comme une donnée d'entrée du planning. Les quatre mois les plus pluvieux sont
+    affectés par construction aux tâches insensibles à la pluie — ouvrages en béton,
+    préfabrication, pose de bordures, travaux de nuit sous abri — et les terrassements sont
+    programmés hors de cette fenêtre. Le détail figure au paragraphe 8.5.
+  </div>
+
+  <h2>2.4 Contexte géotechnique</h2>
+  <p>
+    Le tracé traverse trois familles de terrains dont le comportement mécanique impose des
+    traitements distincts. La reconnaissance complémentaire prévue en phase préparatoire
+    (sondages à la pelle tous les 250 m, pénétromètre dynamique tous les 500 m, essais de
+    laboratoire sur prélèvements) vise à préciser les limites de ces zones avant tout
+    engagement de terrassement.
+  </p>
+  <table>
+    <caption>Tableau 2.4 — Zonage géotechnique prévisionnel</caption>
+    <tr><th>Zone</th><th>Localisation</th><th>Nature dominante</th><th>Traitement retenu</th></tr>
+    <tr><td>Z1</td><td>PK 0+000 à 2+600</td><td>Sols hydromorphes, argiles molles, nappe subaffleurante</td><td>Purge jusqu'à 1,20 m, substitution en matériau graveleux, géotextile anticontaminant</td></tr>
+    <tr><td>Z2</td><td>PK 2+600 à 8+200</td><td>Graveleux latéritiques de bonne portance</td><td>Réutilisation en remblai et couche de forme après criblage</td></tr>
+    <tr><td>Z3</td><td>PK 8+200 à 10+400</td><td>Sables argileux, portance moyenne et variable</td><td>Amélioration à la chaux ou substitution partielle selon résultats</td></tr>
+    <tr><td>Z4</td><td>PK 10+400 à 12+400</td><td>Graveleux latéritiques, quelques poches compressibles</td><td>Réutilisation avec purges ponctuelles localisées</td></tr>
+  </table>
+  <p>
+    La zone Z1 concentre l'essentiel du risque technique et financier de l'opération. Elle
+    correspond à une ancienne zone de bas-fond partiellement remblayée, où la nappe se situe
+    en saison humide à moins de 0,80 m du terrain naturel. Les dispositions retenues —
+    rabattement de nappe localisé, purges en tranches courtes immédiatement substituées,
+    interposition d'un géotextile — sont détaillées au paragraphe 6.5.
+  </p>
+
+  <h2>2.5 Réseaux concessionnaires et interfaces</h2>
+  <p>
+    L'emprise du projet est occupée par plusieurs réseaux dont le déplacement conditionne
+    l'avancement. Le recensement contradictoire de ces réseaux, par sondages manuels et
+    détection électromagnétique, constitue l'une des toutes premières tâches de la phase
+    préparatoire&nbsp;: un réseau non détecté est à la fois un risque d'accident grave, un
+    risque d'interruption de service pour les riverains et une cause classique d'arrêt de
+    chantier.
+  </p>
+  <table>
+    <caption>Tableau 2.5 — Réseaux recensés et modalités de traitement</caption>
+    <tr><th>Réseau</th><th>Linéaire concerné</th><th>Contrainte principale</th><th>Traitement</th></tr>
+    <tr><td>Distribution électrique basse et moyenne tension</td><td>11,2 km</td><td>Coupures à programmer, délais de l'exploitant</td><td>Dévoiement préalable, coordination par convention</td></tr>
+    <tr><td>Adduction d'eau potable</td><td>9,4 km</td><td>Continuité de service aux riverains</td><td>Pose de conduites provisoires avant dépose</td></tr>
+    <tr><td>Télécommunications (cuivre et fibre)</td><td>7,8 km</td><td>Fibre structurante — rupture inacceptable</td><td>Détection systématique, terrassement manuel à proximité</td></tr>
+    <tr><td>Assainissement existant</td><td>4,1 km</td><td>Maintien de l'écoulement pendant travaux</td><td>Dérivations provisoires, pompage si nécessaire</td></tr>
+    <tr><td>Branchements privatifs</td><td>≈ 600 unités</td><td>Dispersés, souvent non répertoriés</td><td>Recensement porte-à-porte en phase préparatoire</td></tr>
+  </table>
+
+  <h2>2.6 Contraintes d'exécution sous circulation et contexte riverain</h2>
+  <p>
+    Entre les PK 1+800 et 5+000, l'axe traverse un tissu commercial dense où l'activité
+    économique se déploie en partie sur l'emprise publique. La libération des emprises n'est
+    donc pas seulement une question foncière&nbsp;: elle engage des situations sociales que
+    l'entreprise doit accompagner sans se substituer au maître d'ouvrage. Le dispositif
+    retenu — information préalable, interlocuteur riverain identifié, maintien permanent des
+    accès piétons et des accès véhicules aux commerces — est décrit au paragraphe 7.4.
+  </p>
+  <ul>
+    <li><b>Maintien des accès</b> — aucun riverain ne doit rester sans accès piéton&nbsp;; les
+      accès véhicules sont rétablis sous 48 heures maximum par platelages provisoires.</li>
+    <li><b>Établissements sensibles</b> — trois écoles, un centre de santé et deux marchés
+      bordent l'axe&nbsp;; les phases bruyantes à leur droit sont programmées hors périodes de
+      classe et hors jours de marché.</li>
+    <li><b>Sécurité des piétons</b> — la traversée s'effectue actuellement de façon
+      anarchique&nbsp;; des cheminements provisoires balisés et éclairés sont maintenus en
+      permanence pendant toute la durée des travaux.</li>
+    <li><b>Poussières et nuisances</b> — l'arrosage des pistes et des zones de terrassement
+      est systématique en saison sèche, à raison de deux passages par jour minimum.</li>
+  </ul>
+
+  <h2 id="s27">2.7 Analyse des risques du projet</h2>
+  <p>
+    L'analyse ci-après recense les risques susceptibles d'affecter le délai, la qualité, la
+    sécurité ou le coût de l'opération. Elle est établie en phase d'offre, révisée en phase
+    de préparation après reconnaissance complémentaire, puis actualisée mensuellement en
+    revue de chantier. La criticité est évaluée comme le produit de la probabilité et de la
+    gravité, chacune notée de 1 à 4.
+  </p>
+  <table class="long">
+    <caption>Tableau 2.6 — Matrice des risques et mesures de maîtrise</caption>
+    <tr><th>N°</th><th>Risque identifié</th><th class="num">P</th><th class="num">G</th><th class="num">C</th><th>Mesure de maîtrise retenue</th></tr>
+    <tr><td>R1</td><td>Sols compressibles plus étendus que prévu en zone Z1</td><td class="num">3</td><td class="num">4</td><td class="num">12</td><td>Reconnaissance renforcée avant terrassement, provision de matériau de substitution, purge en tranches courtes</td></tr>
+    <tr><td>R2</td><td>Retard de dévoiement des réseaux par les concessionnaires</td><td class="num">4</td><td class="num">3</td><td class="num">12</td><td>Conventions signées dès la préparation, réunions bimensuelles dédiées, séquencement alternatif des sections</td></tr>
+    <tr><td>R3</td><td>Épisodes pluvieux exceptionnels hors saison</td><td class="num">3</td><td class="num">3</td><td class="num">9</td><td>Assainissement provisoire opérationnel en permanence, fermeture systématique des plateformes en fin de poste</td></tr>
+    <tr><td>R4</td><td>Accident impliquant un usager ou un riverain</td><td class="num">2</td><td class="num">4</td><td class="num">8</td><td>Signalisation temporaire conforme et contrôlée quotidiennement, séparation physique des flux, éclairage des zones de nuit</td></tr>
+    <tr><td>R5</td><td>Endommagement d'un réseau non détecté</td><td class="num">3</td><td class="num">3</td><td class="num">9</td><td>Détection préalable systématique, fouilles manuelles à proximité, procédure d'arrêt immédiat</td></tr>
+    <tr><td>R6</td><td>Indisponibilité de granulats conformes</td><td class="num">2</td><td class="num">3</td><td class="num">6</td><td>Deux sources agréées en parallèle, stock tampon de 15 jours sur base, contrôle à réception</td></tr>
+    <tr><td>R7</td><td>Blocage social lié à la libération des emprises</td><td class="num">3</td><td class="num">3</td><td class="num">9</td><td>Information amont, médiation avec les autorités locales, adaptation du phasage aux secteurs libérés</td></tr>
+    <tr><td>R8</td><td>Panne longue d'un équipement critique (centrale, finisseur)</td><td class="num">2</td><td class="num">3</td><td class="num">6</td><td>Maintenance préventive, stock de pièces critiques, contrat de secours avec une centrale tierce</td></tr>
+    <tr><td>R9</td><td>Congestion aggravée par le chantier</td><td class="num">3</td><td class="num">2</td><td class="num">6</td><td>Plan de circulation validé, basculements de nuit, information des usagers en amont</td></tr>
+    <tr><td>R10</td><td>Non-conformité de compactage détectée tardivement</td><td class="num">2</td><td class="num">3</td><td class="num">6</td><td>Contrôle en continu au gammadensimètre, planche d'essai validée avant chaque atelier</td></tr>
+    <tr><td>R11</td><td>Pollution accidentelle (hydrocarbures) en zone de bas-fond</td><td class="num">2</td><td class="num">4</td><td class="num">8</td><td>Aires étanches pour ravitaillement, kits antipollution sur chaque atelier, interdiction d'entretien hors base</td></tr>
+    <tr><td>R12</td><td>Vol de matériel ou de matériaux sur emprise ouverte</td><td class="num">3</td><td class="num">2</td><td class="num">6</td><td>Gardiennage permanent, stockage en base fermée, marquage du matériel</td></tr>
+  </table>
+
+  <h2>2.8 Synthèse — les sept partis pris techniques du candidat</h2>
+  <p>
+    L'ensemble de l'analyse qui précède se traduit par sept décisions structurantes, qui
+    constituent l'ossature de l'offre technique&nbsp;:
+  </p>
+  <ol>
+    <li><b>Traiter l'assainissement avant la chaussée</b>, section par section, pour ne
+      jamais reconstruire une plateforme sur un drainage inachevé.</li>
+    <li><b>Découper le chantier en sept sections de production</b> de 1,5 à 2 km, traitées
+      en cycles courts avec restitution rapide à la circulation.</li>
+    <li><b>Programmer les terrassements hors de la fenêtre juillet–octobre</b> et affecter
+      cette période aux ouvrages et à la préfabrication.</li>
+    <li><b>Purger systématiquement la zone Z1</b> en tranches courtes immédiatement
+      substituées, plutôt que d'ouvrir de grandes fouilles exposées à la nappe.</li>
+    <li><b>Internaliser la production d'enrobés et le contrôle laboratoire</b>, pour
+      maîtriser à la fois la cadence et la conformité sans dépendance extérieure.</li>
+    <li><b>Traiter les réseaux comme un jalon contractuel</b> et non comme une sujétion,
+      avec un pilotage dédié et un séquencement capable d'absorber un retard concessionnaire.</li>
+    <li><b>Maintenir en permanence les accès riverains et piétons</b>, condition de
+      l'acceptabilité du chantier et donc de sa continuité.</li>
+  </ol>
+</div>
+<div class="chapter" id="ch03">
+  <h1><span class="cnum">3.</span> Références et expériences similaires</h1>
+
+  <p class="lead">
+    Les six références présentées ci-après ont été sélectionnées non pour leur montant, mais
+    pour la similitude des difficultés techniques rencontrées avec celles du présent marché&nbsp;:
+    travaux sous circulation en milieu urbain, sols compressibles, assainissement
+    dimensionnant en climat tropical humide et interfaces multiples avec des concessionnaires
+    de réseaux.
+  </p>
+
+  <h2>3.1 Tableau de synthèse</h2>
+  <table>
+    <caption>Tableau 3.1 — Synthèse des références retenues (données fictives)</caption>
+    <tr><th>Réf.</th><th>Opération</th><th class="num">Année</th><th class="num">Linéaire</th><th>Difficulté principale partagée</th></tr>
+    <tr><td>R-01</td><td>Aménagement de la pénétrante Est de Douala</td><td class="num">2021-2024</td><td class="num">9,8 km</td><td>Travaux sous circulation, 2×2 voies urbaines</td></tr>
+    <tr><td>R-02</td><td>Assainissement pluvial du bassin de Ndogbong</td><td class="num">2020-2022</td><td class="num">14,2 km</td><td>Drainage en zone de bas-fond, nappe haute</td></tr>
+    <tr><td>R-03</td><td>Réhabilitation RN5 section Nkongsamba – Manjo</td><td class="num">2019-2022</td><td class="num">27,5 km</td><td>Terrassements en sols latéritiques, forte pluviométrie</td></tr>
+    <tr><td>R-04</td><td>Voirie structurante de la zone industrielle de Bassa</td><td class="num">2022-2024</td><td class="num">6,4 km</td><td>Trafic poids lourds intense, structure renforcée</td></tr>
+    <tr><td>R-05</td><td>Traversée urbaine de Edéa — RN3</td><td class="num">2023-2025</td><td class="num">5,1 km</td><td>Riverains et commerces en emprise, phasage social</td></tr>
+    <tr><td>R-06</td><td>Ouvrages hydrauliques du corridor Douala – Bafoussam</td><td class="num">2018-2021</td><td class="num">22 ouvrages</td><td>Dalots et exutoires sous circulation maintenue</td></tr>
+  </table>
+
+  <h2>3.2 Fiches détaillées</h2>
+
+  <div class="fiche">
+    <h3>R-01 — Aménagement de la pénétrante Est de Douala</h3>
+    <table>
+      <tr><td>Maître d'ouvrage</td><td>Communauté urbaine de Douala</td></tr>
+      <tr><td>Période d'exécution</td><td>Mars 2021 – Janvier 2024 (34 mois)</td></tr>
+      <tr><td>Montant des travaux</td><td>18,4 milliards FCFA</td></tr>
+      <tr><td>Consistance</td><td>9,8 km en 2×2 voies, 12,1 km de caniveaux couverts, 4 dalots, 280 points lumineux, 38 000 m² de trottoirs</td></tr>
+      <tr><td>Rôle de l'entreprise</td><td>Entreprise générale, mandataire</td></tr>
+    </table>
+    <p>
+      Opération la plus proche du présent marché par sa nature et son contexte. La chaussée
+      a été élargie sous circulation maintenue en permanence, par demi-chaussées successives
+      sur des sections de 1,5 km. La principale difficulté a résidé dans la coordination des
+      dévoiements de réseaux électriques, qui accusaient initialement un retard de quatre
+      mois&nbsp;: le séquencement des sections a été réorganisé pour attaquer d'abord les zones
+      libérées, absorbant intégralement ce retard sans incidence sur le délai contractuel
+      global. C'est cette expérience qui fonde la disposition retenue au paragraphe 2.8,
+      point 6, du présent mémoire.
+    </p>
+  </div>
+
+  <div class="fiche">
+    <h3>R-02 — Assainissement pluvial du bassin versant de Ndogbong</h3>
+    <table>
+      <tr><td>Maître d'ouvrage</td><td>Communauté urbaine de Douala — programme de drainage urbain</td></tr>
+      <tr><td>Période d'exécution</td><td>Septembre 2020 – Décembre 2022 (27 mois)</td></tr>
+      <tr><td>Montant des travaux</td><td>11,9 milliards FCFA</td></tr>
+      <tr><td>Consistance</td><td>14,2 km de collecteurs, 3 bassins de rétention, 9 exutoires, curage de 6 km de drains existants</td></tr>
+      <tr><td>Rôle de l'entreprise</td><td>Entreprise générale</td></tr>
+    </table>
+    <p>
+      Chantier exécuté intégralement en zone de bas-fond avec nappe subaffleurante, dans des
+      conditions géotechniques comparables à celles de la zone Z1 du présent projet. Les
+      fouilles ont été réalisées en tranches courtes de 12 à 15 m, blindées, avec rabattement
+      de nappe par pointes filtrantes et bétonnage immédiat du radier. Le rendement obtenu,
+      de l'ordre de 22 ml de collecteur par jour et par atelier en zone humide, constitue la
+      base des cadences retenues au paragraphe 8.4.
+    </p>
+  </div>
+
+  <div class="fiche">
+    <h3>R-03 — Réhabilitation de la RN5, section Nkongsamba – Manjo</h3>
+    <table>
+      <tr><td>Maître d'ouvrage</td><td>Ministère des Travaux publics</td></tr>
+      <tr><td>Période d'exécution</td><td>Juin 2019 – Octobre 2022 (40 mois)</td></tr>
+      <tr><td>Montant des travaux</td><td>24,7 milliards FCFA</td></tr>
+      <tr><td>Consistance</td><td>27,5 km de chaussée reconstruite, 186 000 m³ de terrassements, 31 ouvrages hydrauliques, 48 000 t d'enrobés</td></tr>
+      <tr><td>Rôle de l'entreprise</td><td>Entreprise générale, mandataire d'un groupement de deux entreprises</td></tr>
+    </table>
+    <p>
+      Référence en matière de production d'enrobés et de maîtrise des cadences en zone à
+      forte pluviométrie. L'entreprise y a exploité sa centrale d'enrobage mobile avec un
+      rendement moyen de 640 t/jour et un pic à 910 t/jour. La planification saisonnière
+      mise en œuvre sur cette opération — concentration des enrobés sur les fenêtres sèches,
+      report des ouvrages en saison humide — est directement transposée au présent marché.
+    </p>
+  </div>
+
+  <div class="fiche">
+    <h3>R-04 — Voirie structurante de la zone industrielle de Bassa</h3>
+    <table>
+      <tr><td>Maître d'ouvrage</td><td>Magasin général du Cameroun — aménageur de la zone</td></tr>
+      <tr><td>Période d'exécution</td><td>Avril 2022 – Août 2024 (28 mois)</td></tr>
+      <tr><td>Montant des travaux</td><td>9,2 milliards FCFA</td></tr>
+      <tr><td>Consistance</td><td>6,4 km de voirie lourde, structure renforcée pour trafic portuaire, 7,8 km d'assainissement, 2 bassins</td></tr>
+      <tr><td>Rôle de l'entreprise</td><td>Entreprise générale</td></tr>
+    </table>
+    <p>
+      Opération dimensionnée pour un trafic poids lourds de 35 % — supérieur à celui du
+      présent marché — avec une structure de chaussée en grave-bitume de 16 cm sur fondation
+      traitée. Aucune dégradation structurelle n'a été relevée lors de la visite de garantie
+      à deux ans. Cette référence atteste la maîtrise de l'entreprise sur les structures
+      soumises à agressivité élevée, point déterminant compte tenu des 22 % de poids lourds
+      de l'accès Ouest.
+    </p>
+  </div>
+
+  <div class="fiche">
+    <h3>R-05 — Traversée urbaine de Edéa (RN3)</h3>
+    <table>
+      <tr><td>Maître d'ouvrage</td><td>Ministère des Travaux publics — commune d'Edéa</td></tr>
+      <tr><td>Période d'exécution</td><td>Février 2023 – Juin 2025 (28 mois)</td></tr>
+      <tr><td>Montant des travaux</td><td>7,6 milliards FCFA</td></tr>
+      <tr><td>Consistance</td><td>5,1 km de traversée urbaine, contre-allées, 6,2 km de caniveaux, 210 points lumineux, requalification de deux carrefours</td></tr>
+      <tr><td>Rôle de l'entreprise</td><td>Entreprise générale</td></tr>
+    </table>
+    <p>
+      Chantier marqué par une forte densité de commerces en emprise, situation directement
+      comparable au secteur PK 1+800 – 5+000 du présent marché. Le dispositif mis en place —
+      un médiateur riverain à plein temps, une réunion hebdomadaire avec les représentants
+      des commerçants, un engagement de rétablissement des accès véhicules sous 48 heures —
+      a permis de mener l'opération sans aucun arrêt de chantier d'origine sociale. Ce
+      dispositif est reconduit à l'identique et décrit au paragraphe 7.4.
+    </p>
+  </div>
+
+  <div class="fiche">
+    <h3>R-06 — Ouvrages hydrauliques du corridor Douala – Bafoussam</h3>
+    <table>
+      <tr><td>Maître d'ouvrage</td><td>Ministère des Travaux publics</td></tr>
+      <tr><td>Période d'exécution</td><td>Janvier 2018 – Novembre 2021 (46 mois)</td></tr>
+      <tr><td>Montant des travaux</td><td>6,8 milliards FCFA</td></tr>
+      <tr><td>Consistance</td><td>22 ouvrages hydrauliques (dalots simples, doubles et triples), 14 exutoires aménagés, protections de berges</td></tr>
+      <tr><td>Rôle de l'entreprise</td><td>Entreprise générale</td></tr>
+    </table>
+    <p>
+      Tous les ouvrages ont été construits sous circulation maintenue, par demi-largeur, avec
+      des déviations provisoires calibrées pour le trafic poids lourds du corridor. La
+      méthodologie de construction en deux phases avec joint de reprise traité, utilisée sur
+      cette opération, est reprise au paragraphe 6.7 pour les six dalots du présent marché.
+    </p>
+  </div>
+
+  <h2>3.3 Enseignements capitalisés et transposition au présent marché</h2>
+  <table>
+    <caption>Tableau 3.2 — Transposition directe des enseignements</caption>
+    <tr><th>Enseignement issu des références</th><th>Application au présent marché</th></tr>
+    <tr><td>Un retard concessionnaire est probable et doit être absorbé par le séquencement, non par une réclamation (R-01)</td><td>Découpage en 7 sections attaquables dans un ordre modifiable&nbsp;; §7.3 et §8.6</td></tr>
+    <tr><td>En sol hydromorphe, les fouilles longues sont ingérables&nbsp;: seule la tranche courte fonctionne (R-02)</td><td>Purges et fouilles limitées à 15 m, substitution immédiate&nbsp;; §6.5 et §6.6</td></tr>
+    <tr><td>Les enrobés doivent être concentrés sur les fenêtres météo favorables (R-03)</td><td>Calendrier saisonnier contraint&nbsp;; §8.5</td></tr>
+    <tr><td>Une structure sous fort trafic PL ne tolère aucune faiblesse de fondation (R-04)</td><td>Planche d'essai et contrôle de compactage renforcé&nbsp;; §9.5</td></tr>
+    <tr><td>L'acceptabilité riveraine conditionne la continuité du chantier (R-05)</td><td>Médiateur riverain dédié à plein temps&nbsp;; §7.4</td></tr>
+    <tr><td>Les ouvrages sous circulation se construisent en deux demi-largeurs (R-06)</td><td>Méthodologie dalots en deux phases&nbsp;; §6.7</td></tr>
+  </table>
+</div>
+<div class="chapter" id="ch04">
+  <h1><span class="cnum">4.</span> Moyens humains</h1>
+
+  <p class="lead">
+    L'équipe affectée au marché est constituée en équipe de projet autonome, placée sous
+    l'autorité d'un directeur de projet unique, interlocuteur permanent du maître d'œuvre.
+    Elle est dimensionnée pour conduire simultanément sept sections de travaux et quatre
+    ateliers de production, tout en assurant un encadrement de proximité sur un linéaire de
+    12,4 km ouvert au public.
+  </p>
+
+  <h2>4.1 Principes d'affectation</h2>
+  <ul>
+    <li><b>Un interlocuteur unique</b> — le directeur de projet engage l'entreprise sur les
+      questions techniques, contractuelles et de planning&nbsp;; il ne peut être remplacé sans
+      accord préalable du maître d'œuvre.</li>
+    <li><b>Encadrement dédié et non partagé</b> — l'encadrement listé au paragraphe 4.3 est
+      affecté à plein temps à cette seule opération pendant toute sa durée.</li>
+    <li><b>Contrôle indépendant de la production</b> — le responsable qualité et le
+      responsable HSE ne dépendent pas hiérarchiquement du directeur de projet mais des
+      directions fonctionnelles du siège.</li>
+    <li><b>Doublement des postes critiques</b> — chaque poste critique dispose d'un
+      suppléant identifié et formé, afin qu'aucune absence ne puisse interrompre la
+      production ou le contrôle.</li>
+    <li><b>Encadrement de proximité</b> — un chef de section par tronçon de 2 km environ,
+      présent en permanence sur son périmètre.</li>
+  </ul>
+
+  <h2>4.2 Organigramme de chantier</h2>
+  <div class="schema">DIRECTEUR DE PROJET — ingénieur génie civil, 18 ans d'expérience
+│
+├── CONDUCTEUR DE TRAVAUX PRINCIPAL
+│     │
+│     ├── Chef de section 1 ...... PK 0+000 – 2+000 ..... équipes terrassement
+│     ├── Chef de section 2 ...... PK 2+000 – 4+000 ..... équipes assainissement
+│     ├── Chef de section 3 ...... PK 4+000 – 6+200 ..... équipes chaussée
+│     ├── Chef de section 4 ...... PK 6+200 – 8+400 ..... équipes ouvrages
+│     ├── Chef de section 5 ...... PK 8+400 – 10+400 .... équipes bordures/trottoirs
+│     ├── Chef de section 6 ...... PK 10+400 – 12+400 ... équipes équipements
+│     │
+│     ├── Chef d'atelier enrobés et centrale d'enrobage
+│     ├── Chef d'atelier ouvrages d'art
+│     ├── Chef topographe (2 brigades)
+│     └── Coordonnateur circulation et signalisation temporaire
+│
+├── RESPONSABLE MÉTHODES ET ÉTUDES ....... études d'exécution, planning, métrés
+│
+├── RESPONSABLE QUALITÉ (*) ............. PAQ, points d'arrêt, laboratoire
+│
+├── RESPONSABLE HSE (*) ................. PPSPS, analyses de risques, secours
+│
+├── RESPONSABLE ENVIRONNEMENT ET SOCIAL (*) ... PGES, médiation riveraine
+│
+└── RESPONSABLE ADMINISTRATIF ET LOGISTIQUE ... marchés, approvisionnements
+
+(*) rattachement fonctionnel aux directions du siège : ces trois responsables
+    n'ont aucun lien hiérarchique avec la production, afin qu'aucun arbitrage
+    entre conformité et avancement ne puisse leur être imposé.</div>
+
+  <h2 id="s43">4.3 Encadrement affecté au projet</h2>
+  <p>
+    Les curriculums vitae détaillés, diplômes et attestations de références des personnes
+    citées ci-après figurent en annexe 3 du présent mémoire. Les profils présentés sont
+    fictifs et ne correspondent à aucune personne réelle.
+  </p>
+  <table class="long">
+    <caption>Tableau 4.1 — Encadrement affecté (profils fictifs)</caption>
+    <tr><th>Poste</th><th>Formation</th><th class="num">Expérience</th><th>Références principales</th><th class="num">Taux</th></tr>
+    <tr><td>Directeur de projet</td><td>Ingénieur génie civil (ENSTP)</td><td class="num">18 ans</td><td>Pénétrante Est de Douala (R-01), RN5 Nkongsamba–Manjo (R-03)</td><td class="num">100 %</td></tr>
+    <tr><td>Conducteur de travaux principal</td><td>Ingénieur travaux publics</td><td class="num">14 ans</td><td>Voirie ZI Bassa (R-04), traversée d'Edéa (R-05)</td><td class="num">100 %</td></tr>
+    <tr><td>Responsable méthodes et études</td><td>Ingénieur génie civil, option infrastructures</td><td class="num">11 ans</td><td>Pénétrante Est (R-01), drainage Ndogbong (R-02)</td><td class="num">100 %</td></tr>
+    <tr><td>Responsable qualité et laboratoire</td><td>Ingénieur géotechnicien</td><td class="num">13 ans</td><td>RN5 (R-03), ZI Bassa (R-04)</td><td class="num">100 %</td></tr>
+    <tr><td>Responsable HSE</td><td>Ingénieur QHSE, certifié ISO 45001</td><td class="num">9 ans</td><td>Drainage Ndogbong (R-02), Edéa (R-05)</td><td class="num">100 %</td></tr>
+    <tr><td>Responsable environnement et social</td><td>Ingénieur environnement</td><td class="num">8 ans</td><td>Edéa (R-05), corridor Douala–Bafoussam (R-06)</td><td class="num">100 %</td></tr>
+    <tr><td>Chef d'atelier ouvrages d'art</td><td>Technicien supérieur GC</td><td class="num">16 ans</td><td>Corridor Douala–Bafoussam, 22 ouvrages (R-06)</td><td class="num">100 %</td></tr>
+    <tr><td>Chef d'atelier enrobés</td><td>Technicien supérieur, spécialité enrobés</td><td class="num">12 ans</td><td>RN5 (R-03), ZI Bassa (R-04)</td><td class="num">100 %</td></tr>
+    <tr><td>Chef topographe</td><td>Technicien supérieur topographie</td><td class="num">15 ans</td><td>R-01, R-03, R-05</td><td class="num">100 %</td></tr>
+    <tr><td>Coordonnateur circulation</td><td>Technicien supérieur, formation signalisation temporaire</td><td class="num">10 ans</td><td>R-01, R-05</td><td class="num">100 %</td></tr>
+    <tr><td>Médiateur riverain</td><td>Sociologue, médiation de projet</td><td class="num">7 ans</td><td>Edéa (R-05)</td><td class="num">100 %</td></tr>
+    <tr><td>Chefs de section (6 postes)</td><td>Techniciens supérieurs TP</td><td class="num">6 à 12 ans</td><td>Opérations routières urbaines</td><td class="num">100 %</td></tr>
+  </table>
+
+  <h3>Profils synthétiques des postes clés</h3>
+  <div class="fiche">
+    <h3>Directeur de projet</h3>
+    <p>
+      Ingénieur génie civil, 18 ans d'expérience dont 11 en conduite d'opérations routières
+      urbaines sous circulation. A dirigé l'aménagement de la pénétrante Est de Douala
+      (9,8 km en 2×2 voies, 34 mois), opération de nature et de complexité directement
+      comparables au présent marché, notamment sur la gestion des interfaces
+      concessionnaires. Maîtrise les procédures de marchés publics de travaux et le
+      pilotage de groupements d'entreprises.
+    </p>
+  </div>
+  <div class="fiche">
+    <h3>Responsable qualité et laboratoire</h3>
+    <p>
+      Ingénieur géotechnicien, 13 ans d'expérience, responsable du laboratoire interne de
+      l'entreprise depuis 2019. A conduit les campagnes de reconnaissance et le contrôle
+      intérieur de la RN5 et de la zone industrielle de Bassa, deux opérations à fortes
+      exigences de portance. Habilité à prononcer la levée des points d'arrêt, sans lien
+      hiérarchique avec la production — disposition détaillée au paragraphe 9.3.
+    </p>
+  </div>
+  <div class="fiche">
+    <h3>Coordonnateur circulation et signalisation temporaire</h3>
+    <p>
+      Technicien supérieur, 10 ans d'expérience exclusivement sur chantiers routiers sous
+      circulation. Responsable de la conception, de la mise en œuvre et du contrôle
+      quotidien des schémas de signalisation temporaire, ainsi que de la coordination avec
+      les services de police et de gendarmerie lors des basculements de nuit. Poste créé
+      spécifiquement pour les opérations à trafic supérieur à 20 000 véhicules par jour.
+    </p>
+  </div>
+
+  <h2>4.4 Effectifs prévisionnels</h2>
+  <table>
+    <caption>Tableau 4.2 — Évolution prévisionnelle des effectifs par phase</caption>
+    <tr><th>Phase</th><th class="num">Mois</th><th class="num">Encadrement</th><th class="num">Maîtrise</th><th class="num">Ouvriers qualifiés</th><th class="num">Ouvriers</th><th class="num">Total</th></tr>
+    <tr><td>Préparation et installation</td><td class="num">M1 – M3</td><td class="num">12</td><td class="num">14</td><td class="num">32</td><td class="num">48</td><td class="num">106</td></tr>
+    <tr><td>Réseaux et assainissement</td><td class="num">M4 – M11</td><td class="num">17</td><td class="num">26</td><td class="num">94</td><td class="num">168</td><td class="num">305</td></tr>
+    <tr><td>Terrassements et couche de forme</td><td class="num">M6 – M15</td><td class="num">18</td><td class="num">30</td><td class="num">116</td><td class="num">192</td><td class="num">356</td></tr>
+    <tr><td>Chaussée et enrobés</td><td class="num">M12 – M21</td><td class="num">18</td><td class="num">28</td><td class="num">124</td><td class="num">174</td><td class="num">344</td></tr>
+    <tr><td>Équipements et finitions</td><td class="num">M18 – M24</td><td class="num">15</td><td class="num">22</td><td class="num">86</td><td class="num">132</td><td class="num">255</td></tr>
+    <tr><td>Repli et remise en état</td><td class="num">M23 – M24</td><td class="num">8</td><td class="num">10</td><td class="num">24</td><td class="num">38</td><td class="num">80</td></tr>
+  </table>
+  <p>
+    L'effectif de pointe, atteint entre le douzième et le quinzième mois lorsque les ateliers
+    de terrassement et de chaussée fonctionnent simultanément, s'élève à environ
+    <b>420 personnes présentes sur site</b>, sous-traitants inclus.
+  </p>
+
+  <h2>4.5 Recrutement local, formation et transfert de compétences</h2>
+  <p>
+    L'entreprise s'engage à recruter localement la totalité de la main-d'œuvre non qualifiée
+    et au moins la moitié de la main-d'œuvre qualifiée, par un dispositif de recrutement
+    organisé en lien avec les autorités des quartiers riverains, afin d'éviter les
+    recrutements informels à l'entrée du chantier, source récurrente de tensions.
+  </p>
+  <table>
+    <caption>Tableau 4.3 — Engagements en matière d'emploi et de formation</caption>
+    <tr><th>Engagement</th><th class="num">Cible</th><th>Modalité de vérification</th></tr>
+    <tr><td>Main-d'œuvre non qualifiée recrutée localement</td><td class="num">100 %</td><td>Registre du personnel, reporting mensuel au maître d'œuvre</td></tr>
+    <tr><td>Main-d'œuvre qualifiée recrutée localement</td><td class="num">≥ 50 %</td><td>Registre du personnel</td></tr>
+    <tr><td>Emplois féminins sur le chantier</td><td class="num">≥ 12 %</td><td>Reporting mensuel, postes identifiés (topographie, laboratoire, signalisation, administration)</td></tr>
+    <tr><td>Jeunes en formation qualifiante (alternance)</td><td class="num">24 personnes</td><td>Conventions avec les centres de formation professionnelle</td></tr>
+    <tr><td>Heures de formation par salarié et par an</td><td class="num">≥ 16 h</td><td>Registre de formation</td></tr>
+    <tr><td>Sous-traitance confiée à des PME locales</td><td class="num">≥ 20 % du montant</td><td>Contrats de sous-traitance déclarés</td></tr>
+  </table>
+  <p>
+    Les 24 jeunes en formation qualifiante sont affectés par binôme auprès de compagnons
+    expérimentés, sur les métiers de coffreur, ferrailleur, maçon VRD, conducteur d'engin et
+    aide-topographe. À l'issue du chantier, un certificat de compétences leur est délivré,
+    cosigné par le centre de formation partenaire.
+  </p>
+
+  <h2>4.6 Continuité et relève</h2>
+  <p>
+    Chaque poste d'encadrement critique dispose d'un suppléant nommément désigné, ayant
+    participé à la phase de préparation et disposant d'un accès complet aux documents
+    d'exécution. En cas d'absence prolongée d'un titulaire, le maître d'œuvre en est informé
+    sous 48 heures et le suppléant prend ses fonctions sans délai. Aucun remplacement
+    définitif d'un poste clé n'intervient sans présentation préalable du remplaçant au maître
+    d'œuvre et justification d'une expérience au moins équivalente.
+  </p>
+</div>
+<div class="chapter" id="ch05">
+  <h1><span class="cnum">5.</span> Moyens matériels</h1>
+
+  <p class="lead">
+    Le parc affecté au marché est constitué d'équipements appartenant en propre à
+    l'entreprise, à l'exception des matériels spécialisés signalés comme loués. Cette
+    propriété du parc est un choix structurant&nbsp;: elle donne la maîtrise des cadences, de la
+    maintenance et de la disponibilité, et supprime la dépendance à un loueur sur les postes
+    critiques du chantier.
+  </p>
+
+  <h2>5.1 Principes de dimensionnement du parc</h2>
+  <ul>
+    <li><b>Un atelier complet par nature de travaux</b>, capable de fonctionner de façon
+      autonome sur sa section sans attendre la libération d'un engin partagé.</li>
+    <li><b>Redondance des équipements critiques</b> — un engin de secours disponible pour
+      chaque fonction dont l'arrêt bloquerait un atelier entier.</li>
+    <li><b>Âge moyen du parc maintenu sous sept ans</b>, avec remplacement programmé des
+      matériels au-delà de 12 000 heures de fonctionnement.</li>
+    <li><b>Maintenance internalisée</b>, avec atelier fixe en base et équipe mobile
+      d'intervention sur site.</li>
+  </ul>
+
+  <h2>5.2 Parc affecté par atelier</h2>
+  <table class="long">
+    <caption>Tableau 5.1 — Matériel affecté au chantier (données fictives)</caption>
+    <tr><th>Atelier</th><th>Matériel</th><th class="num">Nb</th><th>Caractéristiques</th><th>Statut</th></tr>
+    <tr><td rowspan="6">Terrassement</td><td>Bulldozer</td><td class="num">4</td><td>Classe D6 / D8, lame droite et inclinable</td><td>Propriété</td></tr>
+    <tr><td>Pelle hydraulique sur chenilles</td><td class="num">7</td><td>22 à 36 t, godets terrassement et curage</td><td>Propriété</td></tr>
+    <tr><td>Chargeuse sur pneus</td><td class="num">5</td><td>3,0 à 4,2 m³</td><td>Propriété</td></tr>
+    <tr><td>Niveleuse</td><td class="num">4</td><td>Lame 3,70 m, guidage laser</td><td>Propriété</td></tr>
+    <tr><td>Compacteur vibrant monocylindre</td><td class="num">6</td><td>12 à 20 t</td><td>Propriété</td></tr>
+    <tr><td>Camion benne</td><td class="num">28</td><td>15 à 20 m³</td><td>Propriété (22) / location (6)</td></tr>
+
+    <tr><td rowspan="5">Chaussée et enrobés</td><td>Centrale d'enrobage mobile</td><td class="num">1</td><td>Capacité 160 t/h, contrôle automatisé des dosages</td><td>Propriété</td></tr>
+    <tr><td>Finisseur à enrobés</td><td class="num">3</td><td>Largeur de travail 2,5 à 9,0 m, nivellement automatique</td><td>Propriété</td></tr>
+    <tr><td>Compacteur à pneus</td><td class="num">4</td><td>21 à 27 t</td><td>Propriété</td></tr>
+    <tr><td>Compacteur tandem vibrant</td><td class="num">4</td><td>9 à 13 t</td><td>Propriété</td></tr>
+    <tr><td>Répandeuse de liant</td><td class="num">2</td><td>Rampe asservie à la vitesse, 6 000 l</td><td>Propriété</td></tr>
+
+    <tr><td rowspan="4">Assainissement et ouvrages</td><td>Pelle hydraulique à godet de tranchée</td><td class="num">5</td><td>14 à 22 t</td><td>Propriété</td></tr>
+    <tr><td>Blindage de fouille (jeux complets)</td><td class="num">8</td><td>Caissons coulissants jusqu'à 4 m de profondeur</td><td>Propriété</td></tr>
+    <tr><td>Groupe de pointes filtrantes (rabattement)</td><td class="num">3</td><td>Rabattement jusqu'à 4 m, pompes de secours incluses</td><td>Propriété</td></tr>
+    <tr><td>Grue mobile</td><td class="num">2</td><td>35 et 55 t</td><td>Location longue durée</td></tr>
+
+    <tr><td rowspan="3">Béton et préfabrication</td><td>Centrale à béton</td><td class="num">1</td><td>60 m³/h, malaxeur automatisé</td><td>Propriété</td></tr>
+    <tr><td>Camion malaxeur</td><td class="num">6</td><td>8 m³</td><td>Propriété</td></tr>
+    <tr><td>Pompe à béton</td><td class="num">2</td><td>Flèche 36 m</td><td>Propriété (1) / location (1)</td></tr>
+
+    <tr><td rowspan="3">Topographie et laboratoire</td><td>Station totale robotisée</td><td class="num">4</td><td>Précision angulaire 1&Prime;</td><td>Propriété</td></tr>
+    <tr><td>GNSS différentiel (RTK)</td><td class="num">3</td><td>Précision centimétrique</td><td>Propriété</td></tr>
+    <tr><td>Laboratoire de chantier équipé</td><td class="num">1</td><td>Voir §5.5</td><td>Propriété</td></tr>
+
+    <tr><td rowspan="3">Logistique et servitudes</td><td>Camion citerne à eau</td><td class="num">5</td><td>10 000 l, rampe d'arrosage</td><td>Propriété</td></tr>
+    <tr><td>Groupe électrogène</td><td class="num">8</td><td>30 à 250 kVA</td><td>Propriété</td></tr>
+    <tr><td>Tour d'éclairage mobile</td><td class="num">12</td><td>Pour travaux de nuit</td><td>Propriété</td></tr>
+  </table>
+
+  <h2>5.3 Installations fixes de production</h2>
+  <h3>Centrale d'enrobage</h3>
+  <p>
+    La centrale d'enrobage, d'une capacité nominale de 160 t/h, est installée sur la base
+    principale de Bonabéri, à environ 6 km de l'extrémité Est du chantier. Cette proximité
+    limite la durée de transport des enrobés à moins de 25 minutes vers le point le plus
+    éloigné du tracé, ce qui garantit le maintien de la température de mise en œuvre sans
+    recours systématique aux bennes calorifugées. La centrale est équipée d'un dispositif de
+    contrôle automatisé des dosages avec enregistrement continu, dont les tickets sont
+    joints aux documents de suivi d'exécution.
+  </p>
+  <h3>Installation de concassage et criblage</h3>
+  <p>
+    Une installation mobile de criblage est mise en place sur la zone d'emprunt principale
+    afin de traiter les graveleux latéritiques destinés à la couche de forme. Ce traitement
+    sur site évite le transport de matériaux inutilisables et réduit d'environ 18 % le volume
+    de rotations de camions.
+  </p>
+  <h3>Aire de préfabrication</h3>
+  <p>
+    Une aire de préfabrication de 2 400 m² est aménagée en base pour la production des
+    éléments de caniveaux, bordures, dalles de couverture et regards. La préfabrication
+    permet de découpler la production de la pose et constitue, pendant la saison des pluies,
+    la principale activité de report qui maintient le plan de charge (voir §8.5).
+  </p>
+
+  <h2>5.4 Installations de chantier et base-vie</h2>
+  <table>
+    <caption>Tableau 5.2 — Installations prévues</caption>
+    <tr><th>Installation</th><th class="num">Surface</th><th>Contenu</th></tr>
+    <tr><td>Base principale (Bonabéri)</td><td class="num">1,8 ha</td><td>Bureaux, laboratoire, atelier de maintenance, magasin, aire de préfabrication, centrale à béton, parc matériel</td></tr>
+    <tr><td>Base secondaire (PK 8+600)</td><td class="num">0,6 ha</td><td>Bureaux de section, vestiaires, stockage tampon, aire de stationnement d'engins</td></tr>
+    <tr><td>Base-vie</td><td class="num">0,9 ha</td><td>Réfectoire, sanitaires, vestiaires, infirmerie, salle de formation</td></tr>
+    <tr><td>Aires de stockage intermédiaires</td><td class="num">4 × 800 m²</td><td>Réparties le long du tracé pour limiter les transports internes</td></tr>
+  </table>
+  <p>
+    Toutes les installations sont clôturées, gardiennées 24 heures sur 24 et équipées de
+    dispositifs de gestion environnementale décrits au chapitre 11&nbsp;: aires étanches de
+    ravitaillement et d'entretien, séparateur à hydrocarbures, zone de tri des déchets, fosse
+    septique étanche pour les sanitaires.
+  </p>
+
+  <h2>5.5 Laboratoire et moyens de contrôle</h2>
+  <table>
+    <caption>Tableau 5.3 — Équipement du laboratoire de chantier</caption>
+    <tr><th>Domaine</th><th>Équipements</th><th>Essais réalisés sur site</th></tr>
+    <tr><td>Sols</td><td>Moules Proctor et CBR, étuves, tamis, appareils de limites d'Atterberg</td><td>Proctor modifié, CBR, granulométrie, limites, teneur en eau</td></tr>
+    <tr><td>Compactage</td><td>Gammadensimètre (2 unités), densitomètre à membrane</td><td>Densité en place, degré de compactage</td></tr>
+    <tr><td>Portance</td><td>Poutre Benkelman, dynaplaque</td><td>Déflexions, module de plateforme</td></tr>
+    <tr><td>Granulats</td><td>Presse Los Angeles, Micro-Deval, équivalent de sable</td><td>Los Angeles, Micro-Deval, propreté</td></tr>
+    <tr><td>Bétons</td><td>Presse 2 000 kN, cône d'Abrams, moules cylindriques</td><td>Affaissement, résistance à 7 et 28 jours</td></tr>
+    <tr><td>Enrobés</td><td>Extracteur de liant, presse Marshall, carotteuse</td><td>Teneur en liant, granularité, compacité, épaisseurs</td></tr>
+  </table>
+  <p>
+    Le laboratoire est armé par un ingénieur géotechnicien et quatre techniciens. Les essais
+    non réalisables sur site — notamment les essais de module complexe sur enrobés — sont
+    confiés à un laboratoire extérieur accrédité, conformément au plan d'essais du
+    paragraphe 9.5.
+  </p>
+
+  <h2>5.6 Maintenance et disponibilité</h2>
+  <p>
+    La maintenance préventive est organisée selon un plan par machine, fondé sur les heures
+    de fonctionnement relevées quotidiennement. Chaque engin dispose d'un carnet
+    d'entretien numérisé. Un stock de pièces critiques — filtres, courroies, flexibles,
+    pièces d'usure de finisseur et de centrale — est maintenu en magasin, dimensionné pour
+    couvrir quinze jours d'exploitation sans réapprovisionnement.
+  </p>
+  <table>
+    <caption>Tableau 5.4 — Objectifs de disponibilité du matériel</caption>
+    <tr><th>Catégorie de matériel</th><th class="num">Disponibilité visée</th><th>Disposition de secours</th></tr>
+    <tr><td>Centrale d'enrobage</td><td class="num">≥ 95 %</td><td>Convention de secours avec une centrale tierce à Douala</td></tr>
+    <tr><td>Finisseurs</td><td class="num">≥ 92 %</td><td>Troisième finisseur maintenu en réserve</td></tr>
+    <tr><td>Engins de terrassement</td><td class="num">≥ 90 %</td><td>Redondance intra-parc, transfert entre sections</td></tr>
+    <tr><td>Matériel de rabattement de nappe</td><td class="num">≥ 98 %</td><td>Groupe de secours sur chaque atelier en zone Z1</td></tr>
+    <tr><td>Camions</td><td class="num">≥ 88 %</td><td>Recours à la location ponctuelle</td></tr>
+  </table>
+
+  <h2>5.7 Engagement de renfort</h2>
+  <div class="callout">
+    <b>Engagement contractuel.</b> En cas de retard constaté supérieur à quinze jours
+    ouvrables sur un jalon contractuel et imputable à l'entreprise, celle-ci s'engage à
+    mobiliser sous trente jours des moyens de renfort — matériels et humains — prélevés sur
+    ses autres chantiers ou loués, sans incidence financière pour le maître d'ouvrage. Le
+    dispositif de rattrapage correspondant est décrit au paragraphe 8.6.
+  </div>
+</div>
+<div class="chapter" id="ch06">
+  <h1><span class="cnum">6.</span> Méthodologie générale d'exécution</h1>
+
+  <p class="lead">
+    Ce chapitre décrit, tâche par tâche, la manière dont l'entreprise se propose de réaliser
+    les travaux. Chaque paragraphe précise l'ordre des opérations, les moyens affectés, les
+    dispositions particulières liées au contexte de Douala et les points de contrôle associés.
+    Les cadences sont reprises et consolidées au paragraphe 8.4.
+  </p>
+
+  <h2>6.1 Logique générale et découpage en sections de production</h2>
+  <p>
+    Le principe directeur de l'exécution est le <b>cycle court par section</b>&nbsp;: plutôt que
+    d'ouvrir l'ensemble du linéaire et d'y faire progresser des ateliers indépendants, le
+    chantier est découpé en sept sections de 1,5 à 2 km, chacune traitée intégralement —
+    de l'assainissement jusqu'au revêtement — avant restitution définitive à la circulation.
+    Cette organisation limite en permanence le linéaire perturbé, réduit l'exposition des
+    plateformes ouvertes aux intempéries et rend le chantier lisible pour l'usager.
+  </p>
+  <table>
+    <caption>Tableau 6.1 — Découpage en sections de production</caption>
+    <tr><th>Section</th><th>Limites</th><th class="num">Linéaire</th><th>Caractère dominant</th><th>Ordre d'attaque prévu</th></tr>
+    <tr><td>S1</td><td>PK 0+000 – 1+800</td><td class="num">1,8 km</td><td>Sols compressibles (Z1), carrefour de Bonabéri</td><td>3<sup>e</sup></td></tr>
+    <tr><td>S2</td><td>PK 1+800 – 3+400</td><td class="num">1,6 km</td><td>Traversée commerciale dense</td><td>5<sup>e</sup></td></tr>
+    <tr><td>S3</td><td>PK 3+400 – 5+000</td><td class="num">1,6 km</td><td>Traversée commerciale, contre-allées</td><td>6<sup>e</sup></td></tr>
+    <tr><td>S4</td><td>PK 5+000 – 7+000</td><td class="num">2,0 km</td><td>Section courante, emprises libres</td><td>1<sup>er</sup></td></tr>
+    <tr><td>S5</td><td>PK 7+000 – 8+800</td><td class="num">1,8 km</td><td>Section courante, 2 dalots</td><td>2<sup>e</sup></td></tr>
+    <tr><td>S6</td><td>PK 8+800 – 10+600</td><td class="num">1,8 km</td><td>Portance variable (Z3)</td><td>4<sup>e</sup></td></tr>
+    <tr><td>S7</td><td>PK 10+600 – 12+400</td><td class="num">1,8 km</td><td>Section courante, raccordement final</td><td>7<sup>e</sup></td></tr>
+  </table>
+  <div class="callout">
+    <b>Pourquoi commencer par S4 et S5.</b> Ces deux sections présentent des emprises déjà
+    libres et peu de réseaux à dévoyer. Les attaquer en premier permet de produire dès le
+    quatrième mois, pendant que se règlent en parallèle les dévoiements de réseaux et la
+    libération des emprises commerciales des sections S2 et S3, qui sont les plus
+    incertaines. L'ordre d'attaque est ainsi conçu pour que <b>l'incertitude administrative
+    ne bloque jamais la production</b>.
+  </div>
+  <div class="schema">CYCLE TYPE D'UNE SECTION  (durée moyenne 7 à 9 mois, ateliers chevauchés)
+
+  Mois 1   2   3   4   5   6   7   8   9
+        ├───┤                              Piquetage, réseaux, emprises
+            ├───────┤                      Assainissement (caniveaux, exutoires)
+                ├───────┤                  Terrassements, purges, couche de forme
+                        ├───────┤          Fondation GNT + base grave-bitume
+                            ├───┤          Bordures, trottoirs
+                                ├───┤      Roulement BBME
+                                    ├───┤  Signalisation, éclairage, finitions
+                                        ├─┤ Réception et restitution</div>
+
+  <h2>6.2 Installation de chantier et travaux préparatoires</h2>
+  <p>
+    La phase de préparation, d'une durée de trois mois, conditionne l'ensemble du déroulement
+    ultérieur. Elle comprend&nbsp;:
+  </p>
+  <ol>
+    <li><b>Installation des bases</b> — aménagement de la base principale de Bonabéri, de la
+      base secondaire du PK 8+600 et de la base-vie&nbsp;; montage de la centrale d'enrobage et
+      de la centrale à béton&nbsp;; mise en service du laboratoire.</li>
+    <li><b>Reconnaissance géotechnique complémentaire</b> — sondages à la pelle tous les
+      250 m, pénétromètre dynamique tous les 500 m, prélèvements et essais d'identification,
+      afin de préciser les limites des zones Z1 à Z4 et d'arrêter les épaisseurs de purge.</li>
+    <li><b>Levé topographique contradictoire</b> — rétablissement et densification de la
+      polygonale, implantation des repères de nivellement tous les 100 m hors emprise des
+      travaux, levé de l'état des lieux initial.</li>
+    <li><b>Détection et recensement des réseaux</b> — détection électromagnétique sur
+      l'ensemble du linéaire, sondages manuels de confirmation, recensement porte-à-porte des
+      branchements privatifs.</li>
+    <li><b>Constat d'huissier et état des lieux</b> — relevé contradictoire de l'état des
+      constructions riveraines situées à moins de 15 m de l'emprise, avant tout terrassement
+      ou battage.</li>
+    <li><b>Études d'exécution</b> — plans d'exécution, notes de calcul des ouvrages, plans de
+      signalisation temporaire, PAQ, PPSPS et PGES de chantier soumis au visa du maître
+      d'œuvre.</li>
+    <li><b>Mise en place de la signalisation générale de chantier</b> et information des
+      usagers et riverains (voir §7.4).</li>
+  </ol>
+
+  <h2>6.3 Libération des emprises, démolitions et dépose</h2>
+  <p>
+    La libération des emprises relève du maître d'ouvrage&nbsp;; l'entreprise intervient en appui
+    et prend en charge les démolitions et déposes une fois les emprises effectivement
+    libérées. Les matériaux issus des démolitions sont triés sur place&nbsp;: les gravats inertes
+    sont réutilisés en remblai de tranchée ou en couche anti-contaminante après concassage,
+    les autres déchets sont évacués vers des filières autorisées selon le plan de gestion
+    des déchets du paragraphe 11.4.
+  </p>
+  <p>
+    L'abattage d'arbres, limité aux sujets strictement situés dans l'emprise des travaux,
+    fait l'objet d'un repérage contradictoire préalable et d'une compensation par
+    replantation, à raison de trois sujets replantés pour un sujet abattu (voir §6.13).
+  </p>
+
+  <h2>6.4 Déviation et protection des réseaux concessionnaires</h2>
+  <p>
+    Le traitement des réseaux suit une procédure stricte, en six étapes, appliquée section
+    par section et sans exception&nbsp;:
+  </p>
+  <table>
+    <caption>Tableau 6.2 — Procédure de traitement des réseaux</caption>
+    <tr><th class="num">Étape</th><th>Opération</th><th>Responsable</th><th>Point de contrôle</th></tr>
+    <tr><td class="num">1</td><td>Déclaration d'intention de travaux à chaque concessionnaire</td><td>Direction de projet</td><td>Accusé de réception archivé</td></tr>
+    <tr><td class="num">2</td><td>Détection électromagnétique et marquage au sol</td><td>Équipe topographie</td><td>Plan de récolement des détections</td></tr>
+    <tr><td class="num">3</td><td>Sondages manuels de confirmation tous les 50 m et à chaque croisement</td><td>Chef de section</td><td>Fiche de sondage visée</td></tr>
+    <tr><td class="num">4</td><td>Réunion contradictoire sur site avec le concessionnaire</td><td>Direction de projet</td><td>Procès-verbal signé — <b>point d'arrêt</b></td></tr>
+    <tr><td class="num">5</td><td>Dévoiement ou protection en place</td><td>Concessionnaire ou entreprise selon convention</td><td>PV de réception du dévoiement</td></tr>
+    <tr><td class="num">6</td><td>Libération de la section pour terrassement</td><td>Conducteur de travaux</td><td>Autorisation écrite de démarrage</td></tr>
+  </table>
+  <p>
+    À moins d'un mètre d'un réseau identifié, tout terrassement est réalisé <b>manuellement
+    ou à l'aspiratrice</b>, sans exception et quelle que soit l'incidence sur le rendement.
+    Cette règle est rappelée à chaque accueil sécurité et affichée sur les ateliers concernés.
+  </p>
+
+  <h2 id="s65">6.5 Terrassements</h2>
+  <h3>Principes généraux</h3>
+  <p>
+    Les terrassements sont conduits section par section, après achèvement de l'assainissement
+    longitudinal de la section concernée, de façon à ce que les plateformes en cours de
+    réalisation soient drainées en permanence. Les terrassements ne sont jamais engagés sur
+    une section dont l'exutoire n'est pas opérationnel.
+  </p>
+  <h3>Décapage et déblais</h3>
+  <p>
+    Le décapage de la terre végétale est réalisé sur 0,30 m d'épaisseur moyenne&nbsp;; les
+    matériaux sont mis en dépôt provisoire et réutilisés pour les aménagements paysagers et
+    la remise en état des emprunts. Les déblais sont exécutés à la pelle hydraulique avec
+    évacuation directe par camions, sans stockage intermédiaire en emprise afin de ne pas
+    encombrer les voies restées en circulation.
+  </p>
+  <h3>Traitement spécifique de la zone Z1 (PK 0+000 – 2+600)</h3>
+  <p>
+    La zone Z1 fait l'objet du traitement suivant, éprouvé sur l'opération de drainage de
+    Ndogbong (référence R-02)&nbsp;:
+  </p>
+  <ol>
+    <li>Mise en place d'un rabattement de nappe par pointes filtrantes, maintenu en
+      fonctionnement continu — groupe de secours obligatoire sur site.</li>
+    <li>Purge des sols compressibles par tranches de 15 m maximum, la tranche suivante
+      n'étant ouverte qu'après substitution complète de la précédente.</li>
+    <li>Interposition d'un géotextile anticontaminant en fond de purge, remonté sur les
+      flancs.</li>
+    <li>Substitution par matériau graveleux d'apport, mis en œuvre par couches de 0,30 m
+      compactées à 95 % de l'Optimum Proctor Modifié.</li>
+    <li>Contrôle de portance en tête de substitution avant poursuite — <b>point d'arrêt</b>.</li>
+  </ol>
+  <div class="callout">
+    <b>Pourquoi la tranche courte.</b> Une fouille longue ouverte en sol hydromorphe se
+    dégrade dès la première averse et devient impossible à compacter&nbsp;: le matériau de fond
+    se remanie, le rabattement devient inefficace et la purge s'approfondit sans contrôle.
+    La tranche de 15 m immédiatement refermée supprime ce mécanisme. Le rendement apparent
+    est plus faible, mais le rendement réel — mesuré en mètres linéaires définitivement
+    acquis — est supérieur, et la quantité de purge reste maîtrisée.
+  </div>
+  <h3>Remblais et couche de forme</h3>
+  <table>
+    <caption>Tableau 6.3 — Mise en œuvre des remblais et de la couche de forme</caption>
+    <tr><th>Élément</th><th>Épaisseur des couches</th><th>Compactage exigé</th><th>Contrôle</th></tr>
+    <tr><td>Remblai courant</td><td>0,30 m après compactage</td><td>≥ 95 % OPM</td><td>Gammadensimètre, 3 points / 500 m² / couche</td></tr>
+    <tr><td>Remblai de substitution (Z1)</td><td>0,30 m</td><td>≥ 95 % OPM</td><td>Idem + essai de plaque en tête</td></tr>
+    <tr><td>Remblai contigu aux ouvrages</td><td>0,20 m</td><td>≥ 96 % OPM</td><td>Compactage par plaque vibrante, contrôle renforcé</td></tr>
+    <tr><td>Couche de forme (0,40 m)</td><td>2 × 0,20 m</td><td>≥ 97 % OPM</td><td>Déflexion et module de plateforme (EV2 ≥ 50 MPa)</td></tr>
+  </table>
+  <p>
+    Une <b>planche d'essai</b> est réalisée au démarrage de chaque atelier de compactage et à
+    chaque changement de provenance de matériau, afin de caler le nombre de passes, la
+    vitesse de l'engin et la teneur en eau de mise en œuvre. Les paramètres validés sur la
+    planche deviennent la règle opposable à l'atelier.
+  </p>
+
+  <h2 id="s66">6.6 Assainissement et drainage</h2>
+  <p>
+    L'assainissement constitue l'ouvrage le plus déterminant de l'opération&nbsp;: dans le
+    contexte pluviométrique de Douala, la durée de vie de la chaussée dépend directement de
+    l'efficacité du drainage. Il est en conséquence exécuté <b>en premier</b> sur chaque
+    section, et non en accompagnement des travaux de chaussée.
+  </p>
+  <h3>Ordre d'exécution</h3>
+  <ol>
+    <li>Implantation et vérification des fils d'eau sur l'ensemble de la section — les
+      pentes disponibles étant faibles, toute erreur de calage est rédhibitoire.</li>
+    <li>Réalisation des exutoires et des ouvrages de rejet <b>avant</b> les collecteurs
+      amont, afin de ne jamais créer un réseau sans issue.</li>
+    <li>Exécution des collecteurs de l'aval vers l'amont.</li>
+    <li>Raccordement des caniveaux longitudinaux et des avaloirs.</li>
+    <li>Raccordement des branchements riverains existants.</li>
+    <li>Essais d'écoulement et réception hydraulique de la section.</li>
+  </ol>
+  <h3>Exécution des fouilles et pose</h3>
+  <table>
+    <caption>Tableau 6.4 — Dispositions d'exécution de l'assainissement</caption>
+    <tr><th>Sujétion</th><th>Disposition retenue</th></tr>
+    <tr><td>Profondeur supérieure à 1,30 m</td><td>Blindage systématique par caissons coulissants — aucune fouille non blindée n'est accessible au personnel</td></tr>
+    <tr><td>Présence de nappe</td><td>Rabattement par pointes filtrantes, pompage en fond de fouille prohibé en dehors des épuisements ponctuels</td></tr>
+    <tr><td>Longueur de fouille ouverte</td><td>Limitée à 30 m en section courante, 15 m en zone hydromorphe et 10 m en traversée commerciale</td></tr>
+    <tr><td>Traversée d'accès riverain</td><td>Platelage provisoire posé le soir même, accès rétabli sous 48 h</td></tr>
+    <tr><td>Lit de pose</td><td>Béton de propreté ou grave selon section, épaisseur 0,10 m, réglé au laser</td></tr>
+    <tr><td>Remblaiement de tranchée</td><td>Par couches de 0,25 m compactées à 95 % OPM, matériau sélectionné, avec grillage avertisseur</td></tr>
+    <tr><td>Couverture des caniveaux</td><td>Dalles préfabriquées amovibles, calage sur bandes de mortier, pour permettre le curage ultérieur</td></tr>
+  </table>
+  <div class="callout">
+    <b>Curabilité du réseau.</b> Tous les caniveaux sont couverts par des dalles amovibles et
+    équipés de regards de visite tous les 40 m au maximum. Un réseau non curable se
+    colmate en deux à trois saisons des pluies et l'investissement est perdu&nbsp;: la facilité
+    d'entretien est traitée ici comme une exigence de conception, pas comme un détail
+    d'exécution.
+  </div>
+
+  <h2>6.7 Ouvrages hydrauliques — dalots</h2>
+  <p>
+    Les six dalots sont construits sous circulation maintenue, en deux demi-largeurs
+    successives, selon la méthodologie mise en œuvre sur le corridor Douala–Bafoussam
+    (référence R-06). Le cycle par demi-ouvrage est le suivant&nbsp;:
+  </p>
+  <ol>
+    <li>Mise en place de la déviation provisoire et de la signalisation temporaire&nbsp;;
+      basculement de la circulation sur la demi-largeur conservée.</li>
+    <li>Dérivation provisoire des eaux — batardeau et pompage, ou busage provisoire selon
+      le débit.</li>
+    <li>Terrassement, blindage et réalisation du béton de propreté.</li>
+    <li>Ferraillage et coulage du radier — <b>point d'arrêt</b> avant coulage sur contrôle
+      du ferraillage et de l'enrobage.</li>
+    <li>Coffrage, ferraillage et coulage des piédroits, puis du tablier.</li>
+    <li>Cure du béton — impérative sous climat chaud, par humidification continue pendant
+      sept jours minimum.</li>
+    <li>Remblaiement contigu par couches de 0,20 m compactées à la plaque vibrante,
+      symétriquement de part et d'autre de l'ouvrage.</li>
+    <li>Basculement de la circulation et exécution de la seconde demi-largeur, avec joint de
+      reprise traité (reprise de bétonnage piquée, humidifiée et badigeonnée).</li>
+  </ol>
+  <p>
+    Les bétons sont formulés par le laboratoire de l'entreprise, avec des ciments adaptés à
+    l'agressivité du milieu pour les ouvrages situés en zone de bas-fond. Les résistances
+    sont contrôlées à 7 et 28 jours sur éprouvettes prélevées à raison d'un prélèvement par
+    ouvrage et par phase de bétonnage.
+  </p>
+
+  <h2 id="s68">6.8 Couches de chaussée</h2>
+  <p>
+    La structure retenue, conforme aux prescriptions du marché, est dimensionnée pour un
+    trafic de classe élevée sur vingt ans, compte tenu des 22 % de poids lourds relevés sur
+    l'axe.
+  </p>
+  <div class="schema">STRUCTURE DE CHAUSSÉE — PROFIL TYPE
+
+  ┌─────────────────────────────────────────────────┐
+  │  Couche de roulement — BBME 0/10 ......... 6 cm │
+  ├─────────────────────────────────────────────────┤
+  │  Couche d'accrochage — émulsion de bitume       │
+  ├─────────────────────────────────────────────────┤
+  │  Couche de base — grave-bitume GB3 ...... 12 cm │
+  ├─────────────────────────────────────────────────┤
+  │  Couche d'imprégnation                          │
+  ├─────────────────────────────────────────────────┤
+  │  Couche de fondation — GNT 0/31,5 ....... 25 cm │
+  ├─────────────────────────────────────────────────┤
+  │  Couche de forme — matériau sélectionné . 40 cm │
+  ├─────────────────────────────────────────────────┤
+  │  Plateforme support (PST) — EV2 ≥ 50 MPa        │
+  └─────────────────────────────────────────────────┘</div>
+  <h3>Couche de fondation</h3>
+  <p>
+    La grave non traitée 0/31,5 est mise en œuvre en une seule couche de 0,25 m, répandue à
+    la niveleuse à guidage laser, humidifiée à la teneur en eau optimale puis compactée au
+    compacteur vibrant selon les paramètres validés en planche d'essai. Le réglage
+    altimétrique est contrôlé tous les 20 m en trois points de profil, avec une tolérance de
+    ± 2 cm. La portance en tête de fondation est vérifiée à la dynaplaque avant toute
+    application de la couche d'imprégnation.
+  </p>
+  <h3>Couche de base en grave-bitume</h3>
+  <p>
+    La grave-bitume est fabriquée sur la centrale de Bonabéri et mise en œuvre au finisseur
+    en pleine largeur de demi-chaussée, afin de limiter le nombre de joints longitudinaux.
+    Les joints longitudinaux sont décalés d'au moins 20 cm par rapport à ceux de la couche
+    sous-jacente et systématiquement badigeonnés à l'émulsion avant recouvrement. Le
+    compactage est réalisé par un atelier associant compacteur à pneus et compacteur tandem,
+    dans la fenêtre de température définie par la formule d'étude.
+  </p>
+
+  <h2>6.9 Revêtement bitumineux</h2>
+  <table>
+    <caption>Tableau 6.5 — Conditions de mise en œuvre des enrobés</caption>
+    <tr><th>Paramètre</th><th>Exigence retenue</th><th>Moyen de contrôle</th></tr>
+    <tr><td>Température de fabrication</td><td>150 à 170 °C</td><td>Enregistrement automatique en centrale</td></tr>
+    <tr><td>Température de répandage</td><td>≥ 140 °C</td><td>Sonde à l'arrière du finisseur, relevé par gâchée</td></tr>
+    <tr><td>Température de fin de compactage</td><td>≥ 90 °C</td><td>Sonde, relevé par bande</td></tr>
+    <tr><td>Durée maximale de transport</td><td>≤ 45 min</td><td>Ticket de pesée horodaté</td></tr>
+    <tr><td>Conditions météorologiques</td><td>Pas de répandage sous pluie ni sur support humide</td><td>Décision du chef d'atelier, consignée</td></tr>
+    <tr><td>Compacité en place</td><td>≥ 92 % de la compacité de référence</td><td>Gammadensimètre + carottes de contrôle</td></tr>
+    <tr><td>Épaisseur moyenne</td><td>Conforme, tolérance − 0,5 cm</td><td>Carottage, 1 par 500 m² de bande</td></tr>
+    <tr><td>Uni longitudinal</td><td>Contrôlé à la règle de 3 m, flèche ≤ 5 mm</td><td>Contrôle systématique avant réception</td></tr>
+  </table>
+  <p>
+    La couche de roulement n'est mise en œuvre qu'après achèvement des bordures et des
+    trottoirs de la section, afin d'éviter toute circulation d'engins de finition sur le
+    revêtement neuf et de garantir la régularité du raccordement entre chaussée et bordure.
+  </p>
+
+  <h2>6.10 Bordures, trottoirs et accessibilité</h2>
+  <p>
+    Les bordures sont posées sur fondation béton avec épaulement, alignées au cordeau et
+    contrôlées au niveau tous les 20 m. Les trottoirs sont réalisés en pavés autobloquants
+    sur lit de sable et couche de fondation en grave compactée, avec une pente transversale
+    de 2 % dirigée vers la chaussée.
+  </p>
+  <p>
+    L'accessibilité des personnes à mobilité réduite fait l'objet de dispositions
+    systématiques&nbsp;: abaissement des bordures à chaque traversée avec ressaut limité à 2 cm,
+    bandes d'éveil de vigilance podotactiles en tête de chaque traversée, largeur de
+    cheminement libre de tout obstacle maintenue à 1,40 m minimum, pentes des rampes
+    limitées à 5 %. Les regards, chambres de tirage et pieds de candélabres sont implantés
+    hors du cheminement libre.
+  </p>
+
+  <h2>6.11 Signalisation et équipements de sécurité</h2>
+  <ul>
+    <li><b>Signalisation horizontale</b> — application à la machine autotractée après un
+      délai minimal de quinze jours suivant la mise en œuvre du roulement&nbsp;; prémarquage
+      systématique contrôlé contradictoirement avant application définitive.</li>
+    <li><b>Signalisation verticale</b> — panneaux rétroréfléchissants de classe 2, supports
+      galvanisés scellés dans des massifs béton, implantés hors cheminement piéton.</li>
+    <li><b>Glissières de sécurité</b> — sur les sections en remblai de hauteur supérieure à
+      1,50 m et aux abords des ouvrages, avec dispositifs d'extrémité conformes.</li>
+    <li><b>Ralentisseurs et traversées</b> — aux droits des trois écoles et du centre de
+      santé, avec éclairage renforcé et signalisation spécifique.</li>
+    <li><b>Balisage des exutoires et têtes d'ouvrages</b> — garde-corps aux points où le
+      dénivelé présente un risque pour les piétons.</li>
+  </ul>
+
+  <h2>6.12 Éclairage public</h2>
+  <p>
+    Les 412 points lumineux sont implantés sur le terre-plein central en section courante et
+    sur trottoir en traversée urbaine. Les réseaux sont enterrés sous fourreaux avec
+    chambres de tirage, grillage avertisseur et regards de raccordement. Les candélabres
+    sont équipés de luminaires à diodes électroluminescentes, avec régulation de puissance
+    en heures creuses.
+  </p>
+  <p>
+    Les essais comprennent la vérification des continuités et des isolements, la mesure des
+    niveaux d'éclairement par points selon un maillage défini, et un essai de fonctionnement
+    continu de 72 heures avant réception. La mise sous tension définitive est coordonnée
+    avec le distributeur d'énergie et fait l'objet d'un procès-verbal contradictoire.
+  </p>
+
+  <h2>6.13 Aménagements paysagers et finitions</h2>
+  <p>
+    Les aménagements paysagers comprennent l'engazonnement des talus et des délaissés, la
+    plantation d'arbres d'alignement — essences locales adaptées au milieu urbain et
+    sélectionnées pour un système racinaire compatible avec les ouvrages — et la remise en
+    état des zones d'emprunt et des installations de chantier.
+  </p>
+  <p>
+    La terre végétale décapée en début de chantier et stockée en cordons de hauteur limitée
+    à 2 m est réutilisée pour ces aménagements. Les plantations font l'objet d'un
+    engagement d'entretien et de remplacement des sujets non repris pendant toute la durée
+    de la période de garantie (voir chapitre 13).
+  </p>
+</div>
+<div class="chapter" id="ch07">
+  <h1><span class="cnum">7.</span> Organisation du chantier et gestion des interfaces</h1>
+
+  <p class="lead">
+    Un chantier routier urbain sous circulation n'est pas seulement une opération technique&nbsp;:
+    c'est une opération d'interfaces. La performance dépend autant de la capacité à
+    coordonner concessionnaires, riverains, autorités et maître d'œuvre que de la puissance
+    des ateliers. Ce chapitre décrit le dispositif mis en place pour chacune de ces
+    interfaces.
+  </p>
+
+  <h2>7.1 Organisation générale et pilotage</h2>
+  <p>
+    Le pilotage repose sur trois niveaux de réunion, à fréquence et à objet distincts, dont
+    les comptes rendus sont diffusés dans les 48 heures&nbsp;:
+  </p>
+  <table>
+    <caption>Tableau 7.1 — Instances de pilotage</caption>
+    <tr><th>Instance</th><th>Fréquence</th><th>Participants</th><th>Objet</th></tr>
+    <tr><td>Point quotidien de chantier</td><td>Quotidienne, 7h00</td><td>Conducteur de travaux, chefs de section, HSE, topographie</td><td>Programme du jour, sécurité, moyens, points bloquants</td></tr>
+    <tr><td>Réunion hebdomadaire de chantier</td><td>Hebdomadaire</td><td>Maître d'œuvre, direction de projet, encadrement</td><td>Avancement, qualité, points d'arrêt, difficultés</td></tr>
+    <tr><td>Revue mensuelle d'opération</td><td>Mensuelle</td><td>Maître d'ouvrage, maître d'œuvre, direction de projet, siège</td><td>Planning, jalons, risques, décisions contractuelles</td></tr>
+    <tr><td>Commission des réseaux</td><td>Bimensuelle</td><td>Concessionnaires, maître d'œuvre, direction de projet</td><td>Dévoiements, autorisations, coupures programmées</td></tr>
+    <tr><td>Réunion riverains</td><td>Mensuelle, par section</td><td>Médiateur, chef de section, représentants riverains, autorités locales</td><td>Accès, nuisances, calendrier, doléances</td></tr>
+  </table>
+
+  <h2>7.2 Gestion de la circulation et signalisation temporaire</h2>
+  <p>
+    Le maintien de la circulation sur un axe supportant 28 400 véhicules par jour est la
+    contrainte la plus structurante du chantier. Le principe retenu est celui du
+    <b>basculement par demi-chaussée</b>, avec séparation physique des flux de circulation et
+    de l'emprise de travaux.
+  </p>
+  <h3>Principes appliqués</h3>
+  <ul>
+    <li><b>Deux voies de circulation maintenues en permanence</b>, une par sens, d'une
+      largeur minimale de 3,00 m, sur l'intégralité du linéaire et pendant toute la durée du
+      chantier.</li>
+    <li><b>Séparation physique</b> entre circulation et emprise de travaux par séparateurs
+      modulaires lestés, et non par simple balisage souple, dès que la vitesse autorisée
+      dépasse 30 km/h.</li>
+    <li><b>Basculements exécutés de nuit</b>, entre 22h00 et 5h00, en présence des forces de
+      l'ordre, avec information préalable des usagers 72 heures à l'avance.</li>
+    <li><b>Limitation de vitesse progressive</b> — 70, puis 50, puis 30 km/h — avec
+      signalisation d'approche conforme et renforcée à l'entrée de chaque zone de travaux.</li>
+    <li><b>Contrôle quotidien</b> de l'ensemble de la signalisation temporaire par le
+      coordonnateur circulation, consigné sur un registre visé par le maître d'œuvre.</li>
+    <li><b>Éclairage nocturne</b> de toutes les zones de basculement et de rétrécissement,
+      par tours d'éclairage mobiles.</li>
+  </ul>
+  <div class="callout">
+    <b>Engagement sur les interventions d'urgence.</b> Les véhicules de secours, de lutte
+    contre l'incendie et des forces de l'ordre disposent en permanence d'un itinéraire
+    praticable&nbsp;; les emprises de travaux sont conçues pour permettre leur passage sans
+    manœuvre préalable. Les responsables de section disposent des coordonnées des services
+    concernés et un exercice de vérification est conduit à chaque changement de phase
+    majeure.
+  </div>
+
+  <h2>7.3 Interfaces avec les concessionnaires de réseaux</h2>
+  <p>
+    L'expérience de la pénétrante Est de Douala (référence R-01) a montré qu'un retard de
+    dévoiement de réseaux est la cause la plus probable de dérive de planning sur ce type
+    d'opération. Le dispositif mis en place vise moins à empêcher ce retard — qui échappe
+    largement à l'entreprise — qu'à en <b>neutraliser l'effet</b>.
+  </p>
+  <ol>
+    <li>Une <b>convention d'interface</b> est établie avec chaque concessionnaire dès la
+      phase de préparation, précisant les emprises, les délais, les interlocuteurs et les
+      modalités de constat contradictoire.</li>
+    <li>Une <b>commission des réseaux bimensuelle</b> suit l'avancement des dévoiements par
+      section, avec un tableau de bord partagé et un relevé de décisions.</li>
+    <li>L'<b>ordre d'attaque des sections est modifiable</b> à tout moment&nbsp;: le planning est
+      construit de manière à ce qu'une section bloquée puisse être échangée avec une section
+      libérée sans remettre en cause les jalons contractuels (voir §8.6).</li>
+    <li>Tout retard constaté fait l'objet d'une <b>notification écrite immédiate</b> au
+      maître d'œuvre, accompagnée de la proposition de réorganisation correspondante, afin
+      que la décision soit tracée et prise en temps utile.</li>
+  </ol>
+
+  <h2>7.4 Relations avec les riverains et les commerçants</h2>
+  <p>
+    Le secteur PK 1+800 – 5+000 concentre l'essentiel des enjeux riverains. Le dispositif
+    reconduit de l'opération d'Edéa (référence R-05) repose sur un principe simple&nbsp;: une
+    personne identifiée, joignable, présente en permanence sur le terrain, dont c'est la
+    seule mission.
+  </p>
+  <table>
+    <caption>Tableau 7.2 — Dispositif riverains</caption>
+    <tr><th>Disposition</th><th>Modalité</th><th>Engagement</th></tr>
+    <tr><td>Médiateur riverain</td><td>À plein temps sur le chantier, présent sur le terrain</td><td>Joignable en permanence aux heures ouvrables</td></tr>
+    <tr><td>Information préalable</td><td>Affichage, porte-à-porte et annonce radio locale</td><td>7 jours avant toute intervention affectant un accès</td></tr>
+    <tr><td>Rétablissement des accès véhicules</td><td>Platelages et rampes provisoires</td><td>Sous 48 heures maximum</td></tr>
+    <tr><td>Maintien des accès piétons</td><td>Cheminements balisés, éclairés et continus</td><td>En permanence, sans interruption</td></tr>
+    <tr><td>Registre des doléances</td><td>Tenu en base et sur chaque section</td><td>Réponse écrite sous 7 jours</td></tr>
+    <tr><td>Réunion de section</td><td>Mensuelle, avec autorités de quartier</td><td>Compte rendu affiché publiquement</td></tr>
+    <tr><td>Travaux bruyants</td><td>Programmés hors périodes sensibles</td><td>Aucun travail bruyant avant 6h ni après 20h en zone résidentielle</td></tr>
+  </table>
+
+  <h2>7.5 Interface avec le maître d'œuvre</h2>
+  <p>
+    L'entreprise s'engage à soumettre au visa du maître d'œuvre l'ensemble des documents
+    d'exécution dans les délais contractuels, et à ne mettre en œuvre aucun ouvrage sans
+    visa préalable. Les documents suivants sont produits&nbsp;:
+  </p>
+  <ul>
+    <li>Plans d'exécution et notes de calcul des ouvrages&nbsp;;</li>
+    <li>Plan d'assurance qualité et ses procédures d'exécution (chapitre 9)&nbsp;;</li>
+    <li>Plan particulier de sécurité et de protection de la santé (chapitre 10)&nbsp;;</li>
+    <li>Plan de gestion environnementale et sociale de chantier (chapitre 11)&nbsp;;</li>
+    <li>Plans de signalisation temporaire par phase&nbsp;;</li>
+    <li>Planning détaillé et ses mises à jour mensuelles&nbsp;;</li>
+    <li>Fiches de provenance et d'agrément des matériaux&nbsp;;</li>
+    <li>Dossier des ouvrages exécutés en fin d'opération (§9.7).</li>
+  </ul>
+
+  <h2>7.6 Sous-traitance</h2>
+  <p>
+    Les prestations envisagées en sous-traitance sont limitées aux lots spécialisés pour
+    lesquels l'entreprise ne dispose pas de moyens propres. Tout sous-traitant est présenté
+    à l'agrément du maître d'ouvrage avant intervention, et se voit appliquer les mêmes
+    exigences que l'entreprise principale en matière de qualité, de sécurité et
+    d'environnement, ainsi que le même dispositif d'accueil sécurité.
+  </p>
+  <table>
+    <caption>Tableau 7.3 — Prestations envisagées en sous-traitance</caption>
+    <tr><th>Prestation</th><th class="num">Part estimée</th><th>Motif du recours</th></tr>
+    <tr><td>Éclairage public — réseaux et raccordements</td><td class="num">6 %</td><td>Habilitations électriques spécifiques et agrément du distributeur</td></tr>
+    <tr><td>Signalisation horizontale</td><td class="num">3 %</td><td>Matériel d'application spécialisé</td></tr>
+    <tr><td>Aménagements paysagers et plantations</td><td class="num">2 %</td><td>Compétence horticole, suivi de reprise</td></tr>
+    <tr><td>Gardiennage et nettoyage des installations</td><td class="num">2 %</td><td>Prestation de service, PME locales</td></tr>
+    <tr><td>Transport de matériaux en appoint</td><td class="num">7 %</td><td>Absorption des pointes, transporteurs locaux</td></tr>
+  </table>
+</div>
+<div class="chapter" id="ch08">
+  <h1><span class="cnum">8.</span> Planning et maîtrise des délais</h1>
+
+  <p class="lead">
+    Le délai proposé est de <b>24 mois</b>, décomposé en trois mois de préparation et
+    vingt et un mois de travaux, repli compris. Ce délai intègre par construction les
+    contraintes climatiques et les incertitudes liées aux réseaux et aux emprises&nbsp;: il
+    n'est pas un délai théorique auquel on ajouterait ensuite des aléas.
+  </p>
+
+  <h2>8.1 Structure du planning</h2>
+  <p>
+    Le planning est établi sous forme de diagramme de Gantt à ressources, à trois niveaux
+    d'agrégation&nbsp;: un planning directeur contractuel à la maille du jalon, un planning
+    détaillé par section à la maille de la tâche, et un planning glissant à six semaines,
+    actualisé chaque semaine et diffusé en réunion de chantier. Le planning directeur est
+    mis à jour mensuellement et transmis au maître d'œuvre avec une note d'analyse
+    expliquant tout écart supérieur à cinq jours ouvrables sur un jalon.
+  </p>
+
+  <h2>8.2 Jalons contractuels</h2>
+  <table class="long">
+    <caption>Tableau 8.1 — Jalons prévisionnels de l'opération</caption>
+    <tr><th>Jalon</th><th>Désignation</th><th class="num">Échéance</th><th>Condition de franchissement</th></tr>
+    <tr><td>J1</td><td>Ordre de service et démarrage de la préparation</td><td class="num">M0</td><td>Notification du marché</td></tr>
+    <tr><td>J2</td><td>Installations opérationnelles (bases, centrales, laboratoire)</td><td class="num">M2</td><td>PV de constat contradictoire</td></tr>
+    <tr><td>J3</td><td>Documents d'exécution visés (PAQ, PPSPS, PGES, plans)</td><td class="num">M3</td><td>Visa du maître d'œuvre</td></tr>
+    <tr><td>J4</td><td>Démarrage des travaux — sections S4 et S5</td><td class="num">M4</td><td>Emprises libérées et réseaux traités</td></tr>
+    <tr><td>J5</td><td>Assainissement achevé sur S4 et S5</td><td class="num">M9</td><td>Réception hydraulique des sections</td></tr>
+    <tr><td>J6</td><td>Achèvement de la première section complète (S4)</td><td class="num">M12</td><td>Roulement posé, équipements en place</td></tr>
+    <tr><td>J7</td><td>Mi-parcours — 50 % du linéaire en structure de chaussée</td><td class="num">M14</td><td>Constat contradictoire d'avancement</td></tr>
+    <tr><td>J8</td><td>Achèvement des six dalots</td><td class="num">M16</td><td>Réception des ouvrages</td></tr>
+    <tr><td>J9</td><td>Achèvement des sections commerciales S2 et S3</td><td class="num">M19</td><td>Restitution complète à la circulation</td></tr>
+    <tr><td>J10</td><td>Achèvement du roulement sur l'ensemble du linéaire</td><td class="num">M21</td><td>Contrôles d'uni et de compacité conformes</td></tr>
+    <tr><td>J11</td><td>Équipements achevés (signalisation, éclairage, glissières)</td><td class="num">M22</td><td>Essais d'éclairage concluants</td></tr>
+    <tr><td>J12</td><td>Repli, remise en état et réception</td><td class="num">M24</td><td>PV de réception</td></tr>
+  </table>
+
+  <h2>8.3 Chemin critique</h2>
+  <p>
+    Le chemin critique de l'opération ne passe pas par les terrassements ni par les enrobés,
+    dont la capacité de production est surdimensionnée par rapport au besoin. Il passe par
+    la séquence suivante&nbsp;:
+  </p>
+  <div class="schema">CHEMIN CRITIQUE
+
+  Libération des emprises (S2/S3)
+        └──► Dévoiement des réseaux
+                └──► Assainissement de section
+                        └──► Terrassements et couche de forme
+                                └──► Structure de chaussée
+                                        └──► Roulement
+                                                └──► Équipements ──► Réception
+
+  Marge disponible :   S4, S5 → 6 semaines      S2, S3 → 0 (critique)</div>
+  <p>
+    Les sections S2 et S3, qui cumulent la densité commerciale, la libération d'emprises la
+    plus incertaine et la plus forte concentration de réseaux, sont sans marge. C'est
+    pourquoi elles ne sont pas attaquées en premier — ce qui exposerait tout le chantier à
+    leur incertitude — mais en cinquième et sixième position, après que la production a été
+    engagée ailleurs et que le temps administratif nécessaire s'est écoulé.
+  </p>
+
+  <h2>8.4 Cadences retenues</h2>
+  <p>
+    Les cadences ci-dessous sont issues des rendements effectivement constatés sur les
+    opérations de référence, minorées d'un coefficient de sécurité tenant compte des
+    contraintes urbaines propres au présent marché.
+  </p>
+  <table class="long">
+    <caption>Tableau 8.2 — Cadences de production retenues</caption>
+    <tr><th>Tâche</th><th class="num">Cadence retenue</th><th class="num">Ateliers</th><th>Référence de rendement</th></tr>
+    <tr><td>Décapage et déblais</td><td class="num">900 m³/jour/atelier</td><td class="num">2</td><td>R-03, minoré de 15 %</td></tr>
+    <tr><td>Purges en zone hydromorphe</td><td class="num">120 m³/jour/atelier</td><td class="num">2</td><td>R-02, tranches de 15 m</td></tr>
+    <tr><td>Remblai et couche de forme</td><td class="num">1 100 m³/jour/atelier</td><td class="num">2</td><td>R-03</td></tr>
+    <tr><td>Caniveaux — section courante</td><td class="num">38 ml/jour/atelier</td><td class="num">3</td><td>R-01</td></tr>
+    <tr><td>Caniveaux — zone hydromorphe</td><td class="num">22 ml/jour/atelier</td><td class="num">2</td><td>R-02</td></tr>
+    <tr><td>Caniveaux — traversée commerciale</td><td class="num">16 ml/jour/atelier</td><td class="num">2</td><td>R-05</td></tr>
+    <tr><td>Grave non traitée (fondation)</td><td class="num">700 m³/jour</td><td class="num">1</td><td>R-03</td></tr>
+    <tr><td>Grave-bitume</td><td class="num">520 t/jour</td><td class="num">1</td><td>R-03, minoré de 20 %</td></tr>
+    <tr><td>Enrobé de roulement</td><td class="num">480 t/jour</td><td class="num">1</td><td>R-03, minoré de 20 %</td></tr>
+    <tr><td>Bordures</td><td class="num">120 ml/jour/atelier</td><td class="num">3</td><td>R-05</td></tr>
+    <tr><td>Trottoirs en pavés</td><td class="num">180 m²/jour/atelier</td><td class="num">3</td><td>R-05</td></tr>
+    <tr><td>Dalot cadre (par demi-ouvrage)</td><td class="num">28 jours</td><td class="num">2</td><td>R-06</td></tr>
+    <tr><td>Pose de candélabres</td><td class="num">8 points/jour</td><td class="num">2</td><td>R-01</td></tr>
+  </table>
+
+  <h2 id="s85">8.5 Stratégie saisonnière</h2>
+  <p>
+    La pluviométrie de Douala interdit de planifier les mêmes tâches toute l'année. Le
+    planning affecte donc explicitement les quatre mois les plus pluvieux (juillet à
+    octobre) à des activités insensibles aux intempéries, de façon à maintenir le plan de
+    charge et l'effectif sans dégrader la qualité.
+  </p>
+  <table>
+    <caption>Tableau 8.3 — Affectation saisonnière des tâches</caption>
+    <tr><th>Période</th><th>Tâches privilégiées</th><th>Tâches proscrites ou restreintes</th></tr>
+    <tr><td>Décembre – février<br><i>(saison sèche)</i></td><td>Terrassements, couche de forme, fondation, enrobés — plein régime, y compris en horaires étendus</td><td>Aucune restriction particulière</td></tr>
+    <tr><td>Mars – mai</td><td>Terrassements, chaussée, ouvrages</td><td>Enrobés soumis à validation de fenêtre météo quotidienne</td></tr>
+    <tr><td>Juin</td><td>Assainissement, ouvrages, préfabrication, bordures</td><td>Terrassements ralentis&nbsp;; couche de forme suspendue en cas de pluie</td></tr>
+    <tr><td>Juillet – octobre<br><i>(saison des pluies)</i></td><td>Ouvrages d'art et bétons, préfabrication en base, pose de bordures et de dalles, réseaux secs, éclairage, signalisation verticale, travaux de nuit sous fenêtre sèche</td><td>Terrassements, couche de forme, fondation, enrobés — suspendus sauf fenêtre météo confirmée</td></tr>
+    <tr><td>Novembre</td><td>Reprise progressive des terrassements, purges</td><td>Enrobés soumis à fenêtre météo</td></tr>
+  </table>
+  <div class="callout">
+    <b>Conséquence sur le plan de charge.</b> L'aire de préfabrication de 2 400 m² décrite au
+    paragraphe 5.3 n'est pas un confort&nbsp;: c'est l'outil qui permet de maintenir 250 à 300
+    personnes en activité productive pendant les quatre mois où la plateforme est
+    inexploitable. Les éléments préfabriqués pendant cette période — dalles de couverture,
+    éléments de caniveaux, bordures, regards — alimentent ensuite les ateliers de pose dès
+    la reprise, ce qui accélère le redémarrage.
+  </div>
+
+  <h2>8.6 Détection et rattrapage des retards</h2>
+  <p>
+    Le dispositif de maîtrise des délais repose sur une détection précoce plutôt que sur des
+    mesures de rattrapage tardives, toujours coûteuses et rarement efficaces.
+  </p>
+  <table>
+    <caption>Tableau 8.4 — Dispositif de détection et de réaction</caption>
+    <tr><th>Seuil d'alerte</th><th>Constat</th><th>Réaction engagée</th><th>Délai</th></tr>
+    <tr><td>Niveau 1</td><td>Écart &lt; 5 jours ouvrables sur une tâche non critique</td><td>Ajustement interne des moyens de l'atelier concerné</td><td>Immédiat</td></tr>
+    <tr><td>Niveau 2</td><td>Écart de 5 à 15 jours, ou tâche du chemin critique affectée</td><td>Note d'analyse au maître d'œuvre, renfort d'atelier, extension des horaires</td><td>Sous 7 jours</td></tr>
+    <tr><td>Niveau 3</td><td>Écart &gt; 15 jours sur un jalon contractuel</td><td>Plan de rattrapage formalisé&nbsp;: moyens supplémentaires mobilisés (§5.7), réorganisation du séquencement, travail en deux postes si nécessaire</td><td>Sous 30 jours</td></tr>
+    <tr><td>Niveau 4</td><td>Blocage externe durable (emprises, réseaux, force majeure)</td><td>Notification écrite, proposition d'inversion de sections, demande de décision au maître d'ouvrage</td><td>Immédiat</td></tr>
+  </table>
+  <p>
+    Les leviers de rattrapage mobilisables, par ordre de recours, sont&nbsp;: l'extension des
+    horaires sur les ateliers non contraints par le voisinage, l'ouverture d'un atelier
+    supplémentaire par transfert depuis un autre chantier de l'entreprise, le passage en
+    deux postes sur les tâches compatibles avec le travail de nuit, et enfin la location de
+    moyens complémentaires. Ces leviers sont chiffrés en interne dès la phase de préparation
+    afin d'être activables sans délai de décision.
+  </p>
+</div>
+<div class="chapter" id="ch09">
+  <h1><span class="cnum">9.</span> Plan d'assurance qualité</h1>
+
+  <p class="lead">
+    Le plan d'assurance qualité de l'opération est établi selon le système de management
+    certifié ISO 9001 de l'entreprise et soumis au visa du maître d'œuvre avant tout
+    démarrage de travaux. Son principe directeur est que <b>la qualité se construit au moment
+    de l'exécution et non au moment du contrôle</b>&nbsp;: le contrôle ne fait que confirmer une
+    conformité déjà obtenue.
+  </p>
+
+  <h2>9.1 Organisation qualité</h2>
+  <p>
+    La responsabilité de la qualité incombe à chaque niveau de la ligne de production. Le
+    responsable qualité n'est pas le garant de la conformité — il en est le vérificateur
+    indépendant. Il est rattaché hiérarchiquement à la Direction QSE du siège et non à la
+    Direction des travaux&nbsp;: il ne peut donc pas être placé en situation d'arbitrer entre
+    conformité et avancement.
+  </p>
+  <table>
+    <caption>Tableau 9.1 — Responsabilités en matière de qualité</caption>
+    <tr><th>Acteur</th><th>Responsabilité</th></tr>
+    <tr><td>Directeur de projet</td><td>Approuve le PAQ, arbitre les décisions de reprise, engage l'entreprise vis-à-vis du maître d'œuvre</td></tr>
+    <tr><td>Responsable qualité</td><td>Rédige et tient à jour le PAQ, organise le contrôle intérieur, prononce la levée des points d'arrêt, traite les non-conformités</td></tr>
+    <tr><td>Conducteur de travaux</td><td>Applique les procédures d'exécution, s'assure de la disponibilité des moyens conformes</td></tr>
+    <tr><td>Chefs de section et chefs d'atelier</td><td>Réalisent l'autocontrôle, renseignent les fiches de suivi, alertent en cas de dérive</td></tr>
+    <tr><td>Laboratoire</td><td>Réalise les essais du plan d'essais, édite les procès-verbaux, alerte sans délai en cas de résultat non conforme</td></tr>
+    <tr><td>Topographie</td><td>Contrôle les implantations et les nivellements, édite les plans de récolement</td></tr>
+  </table>
+
+  <h2>9.2 Composition du plan d'assurance qualité</h2>
+  <ul>
+    <li><b>Note d'organisation générale</b> — organigramme, responsabilités, moyens de
+      contrôle, gestion documentaire.</li>
+    <li><b>Procédures d'exécution</b> par nature d'ouvrage — une par tâche élémentaire&nbsp;:
+      terrassements, purges, assainissement, ouvrages, fondation, grave-bitume, roulement,
+      bordures, équipements.</li>
+    <li><b>Plan de contrôle</b> — nature, fréquence et responsable de chaque contrôle,
+      points d'arrêt et points critiques.</li>
+    <li><b>Plan d'essais</b> — essais de laboratoire, fréquences, critères d'acceptation.</li>
+    <li><b>Cadre des documents de suivi</b> — fiches de contrôle, fiches de non-conformité,
+      registre des points d'arrêt.</li>
+    <li><b>Liste des matériaux et fiches de provenance</b> soumises à agrément préalable.</li>
+  </ul>
+
+  <h2>9.3 Contrôle intérieur et contrôle extérieur</h2>
+  <p>
+    Le contrôle intérieur relève de l'entreprise et comporte deux niveaux&nbsp;: l'<b>autocontrôle</b>,
+    exercé par l'exécutant lui-même au fil de la production, et le <b>contrôle intérieur
+    proprement dit</b>, exercé par le responsable qualité et le laboratoire, indépendamment de
+    la production. Le contrôle extérieur relève du maître d'œuvre&nbsp;; l'entreprise s'engage à
+    lui donner libre accès à ses installations, à son laboratoire et à l'ensemble de ses
+    documents de suivi, et à l'informer 48 heures à l'avance de tout point d'arrêt à lever.
+  </p>
+
+  <h2>9.4 Points d'arrêt et points critiques</h2>
+  <p>
+    Un <b>point critique</b> est une opération dont l'exécution est surveillée mais qui ne
+    suspend pas l'avancement. Un <b>point d'arrêt</b> interdit la poursuite des travaux tant
+    qu'il n'a pas été formellement levé. Le délai de préavis est de 48 heures, et l'absence
+    du maître d'œuvre au terme du délai vaut levée tacite, actée par écrit.
+  </p>
+  <table class="long">
+    <caption>Tableau 9.2 — Points d'arrêt (PA) et points critiques (PC) de l'opération</caption>
+    <tr><th>Réf.</th><th>Opération concernée</th><th>Type</th><th>Condition de levée</th></tr>
+    <tr><td>PA-01</td><td>Réception du fond de purge avant substitution</td><td>PA</td><td>Constat contradictoire, portance vérifiée</td></tr>
+    <tr><td>PA-02</td><td>Réception de la plateforme support avant couche de forme</td><td>PA</td><td>EV2 ≥ 50 MPa, nivellement conforme</td></tr>
+    <tr><td>PA-03</td><td>Réception de la couche de forme avant fondation</td><td>PA</td><td>Compactage ≥ 97 % OPM, déflexions conformes</td></tr>
+    <tr><td>PA-04</td><td>Ferraillage des ouvrages avant bétonnage</td><td>PA</td><td>Conformité au plan, enrobage vérifié</td></tr>
+    <tr><td>PA-05</td><td>Réception des fils d'eau avant pose de caniveaux</td><td>PA</td><td>Nivellement contradictoire</td></tr>
+    <tr><td>PA-06</td><td>Réception de la fondation avant imprégnation</td><td>PA</td><td>Portance, épaisseur, nivellement</td></tr>
+    <tr><td>PA-07</td><td>Planche d'essai de compactage (par atelier et par matériau)</td><td>PA</td><td>Paramètres validés par le laboratoire</td></tr>
+    <tr><td>PA-08</td><td>Planche d'essai d'enrobés</td><td>PA</td><td>Compacité et uni conformes</td></tr>
+    <tr><td>PA-09</td><td>Réception du support avant couche de roulement</td><td>PA</td><td>Propreté, accrochage, absence de ressuage</td></tr>
+    <tr><td>PA-10</td><td>Constat contradictoire réseaux avant terrassement</td><td>PA</td><td>PV signé avec le concessionnaire</td></tr>
+    <tr><td>PC-01</td><td>Agrément des provenances de matériaux</td><td>PC</td><td>Fiche de provenance et essais d'identification</td></tr>
+    <tr><td>PC-02</td><td>Formulation des bétons et des enrobés</td><td>PC</td><td>Étude de formulation validée</td></tr>
+    <tr><td>PC-03</td><td>Implantation générale et polygonale</td><td>PC</td><td>Contrôle topographique contradictoire</td></tr>
+    <tr><td>PC-04</td><td>Mise en place de la signalisation temporaire</td><td>PC</td><td>Conformité au plan visé, contrôle quotidien</td></tr>
+    <tr><td>PC-05</td><td>Cure des bétons</td><td>PC</td><td>Fiche de suivi de cure</td></tr>
+    <tr><td>PC-06</td><td>Remblaiement contigu aux ouvrages</td><td>PC</td><td>Compactage par couches, contrôle de densité</td></tr>
+  </table>
+
+  <h2 id="s95">9.5 Plan d'essais</h2>
+  <table class="long">
+    <caption>Tableau 9.3 — Plan d'essais et fréquences de contrôle</caption>
+    <tr><th>Matériau / ouvrage</th><th>Essai</th><th class="num">Fréquence</th><th>Critère d'acceptation</th></tr>
+    <tr><td rowspan="4">Matériaux de remblai et couche de forme</td><td>Identification (granulométrie, limites)</td><td class="num">1 / 2 000 m³ et par provenance</td><td>Conforme au CCTP</td></tr>
+    <tr><td>Proctor modifié</td><td class="num">1 / 4 000 m³</td><td>Référence de compactage</td></tr>
+    <tr><td>CBR après immersion</td><td class="num">1 / 4 000 m³</td><td>≥ valeur prescrite</td></tr>
+    <tr><td>Densité en place</td><td class="num">3 points / 500 m² / couche</td><td>≥ 95 à 97 % OPM selon couche</td></tr>
+    <tr><td rowspan="3">Grave non traitée</td><td>Los Angeles / Micro-Deval</td><td class="num">1 / 1 000 m³</td><td>Conforme au CCTP</td></tr>
+    <tr><td>Densité en place</td><td class="num">3 points / 400 m²</td><td>≥ 97 % OPM</td></tr>
+    <tr><td>Essai de plaque (EV2)</td><td class="num">1 / 100 ml</td><td>≥ valeur prescrite</td></tr>
+    <tr><td rowspan="4">Enrobés (GB3 et BBME)</td><td>Teneur en liant et granularité</td><td class="num">1 / 200 t</td><td>Tolérances de la formule d'étude</td></tr>
+    <tr><td>Compacité au gammadensimètre</td><td class="num">Continue, 1 mesure / 50 m / bande</td><td>≥ 92 %</td></tr>
+    <tr><td>Carottage (épaisseur et compacité)</td><td class="num">1 / 500 m² de bande</td><td>Épaisseur ≥ nominale − 0,5 cm</td></tr>
+    <tr><td>Uni à la règle de 3 m</td><td class="num">Systématique avant réception</td><td>Flèche ≤ 5 mm</td></tr>
+    <tr><td rowspan="3">Bétons</td><td>Affaissement au cône</td><td class="num">1 / gâchée de contrôle</td><td>Plage de la formule</td></tr>
+    <tr><td>Résistance à 7 jours</td><td class="num">1 prélèvement / ouvrage / phase</td><td>Indicatif</td></tr>
+    <tr><td>Résistance à 28 jours</td><td class="num">1 prélèvement / ouvrage / phase</td><td>≥ résistance caractéristique</td></tr>
+    <tr><td>Chaussée terminée</td><td>Déflexions à la poutre Benkelman</td><td class="num">1 / 25 ml en quinconce</td><td>≤ déflexion admissible</td></tr>
+    <tr><td>Assainissement</td><td>Essai d'écoulement et contrôle des pentes</td><td class="num">Systématique, par tronçon</td><td>Écoulement libre, pente conforme</td></tr>
+    <tr><td>Éclairage</td><td>Isolement, continuité, éclairement</td><td class="num">Systématique</td><td>Valeurs prescrites, essai 72 h concluant</td></tr>
+  </table>
+
+  <h2>9.6 Traitement des non-conformités</h2>
+  <p>
+    Toute non-conformité détectée — par l'autocontrôle, le contrôle intérieur ou le contrôle
+    extérieur — fait l'objet d'une fiche numérotée, enregistrée dans un registre unique tenu
+    par le responsable qualité. La procédure de traitement est la suivante&nbsp;:
+  </p>
+  <ol>
+    <li><b>Constat et arrêt</b> — la production de la tâche concernée est suspendue si la
+      non-conformité est susceptible de se reproduire ou d'être masquée par la suite des
+      travaux.</li>
+    <li><b>Analyse des causes</b> — par le responsable qualité avec le chef d'atelier, sur
+      la base des paramètres d'exécution enregistrés.</li>
+    <li><b>Proposition de traitement</b> — reprise, réparation, renforcement ou acceptation
+      en l'état&nbsp;; toute proposition d'acceptation en l'état est soumise au maître d'œuvre,
+      avec justification technique.</li>
+    <li><b>Décision et exécution</b> — après visa du maître d'œuvre pour les non-conformités
+      affectant la structure ou la durabilité.</li>
+    <li><b>Vérification de l'efficacité</b> — contrôle après traitement, clôture de la fiche.</li>
+    <li><b>Action préventive</b> — extension du contrôle aux ouvrages comparables et
+      modification de la procédure d'exécution si la cause est systémique.</li>
+  </ol>
+  <div class="callout">
+    <b>Engagement.</b> Aucune non-conformité affectant la structure de chaussée, un ouvrage
+    en béton armé ou l'écoulement des eaux ne fait l'objet d'une acceptation en l'état sans
+    accord écrit du maître d'œuvre, quelle qu'en soit l'incidence sur le planning.
+  </div>
+
+  <h2>9.7 Dossier des ouvrages exécutés</h2>
+  <p>
+    Le dossier des ouvrages exécutés est constitué au fil de l'avancement et non reconstitué
+    en fin de chantier. Il est remis en trois exemplaires papier et un exemplaire numérique
+    indexé, et comprend&nbsp;: les plans de récolement de la chaussée, de l'assainissement, des
+    ouvrages et des réseaux secs&nbsp;; les notes de calcul des ouvrages&nbsp;; l'ensemble des
+    procès-verbaux d'essais et de réception&nbsp;; le registre des points d'arrêt&nbsp;; le registre
+    des non-conformités et leur traitement&nbsp;; les fiches de provenance et d'agrément des
+    matériaux&nbsp;; les notices d'entretien des équipements&nbsp;; et le dossier photographique de
+    l'opération.
+  </p>
+</div>
+<div class="chapter" id="ch10">
+  <h1><span class="cnum">10.</span> Hygiène, sécurité et protection de la santé</h1>
+
+  <p class="lead">
+    Le chantier se déroule sur un axe supportant près de 28 400 véhicules par jour, au
+    contact permanent de piétons, de commerces et d'établissements scolaires. La sécurité
+    n'y concerne donc pas seulement les travailleurs&nbsp;: elle engage tout autant les usagers
+    de la route et les riverains. Le plan particulier de sécurité et de protection de la
+    santé est établi sur cette double exigence.
+  </p>
+
+  <h2>10.1 Politique et organisation de la sécurité</h2>
+  <p>
+    L'entreprise applique un système de management de la santé et de la sécurité certifié
+    ISO 45001. Le responsable HSE de l'opération est rattaché à la Direction QSE du siège,
+    dispose d'une autorité d'arrêt immédiat de toute tâche présentant un danger grave et
+    imminent, et ne peut voir cette décision infirmée par la ligne de production.
+  </p>
+  <table>
+    <caption>Tableau 10.1 — Moyens humains affectés à la sécurité</caption>
+    <tr><th>Fonction</th><th class="num">Effectif</th><th>Mission</th></tr>
+    <tr><td>Responsable HSE</td><td class="num">1</td><td>Pilotage du PPSPS, analyses de risques, autorité d'arrêt, relations avec l'inspection du travail</td></tr>
+    <tr><td>Animateurs sécurité de terrain</td><td class="num">3</td><td>Présence permanente sur les sections actives, contrôles, accueils sécurité</td></tr>
+    <tr><td>Secouristes formés</td><td class="num">24</td><td>Au moins deux par section active et par poste</td></tr>
+    <tr><td>Infirmier</td><td class="num">1</td><td>Poste de secours en base-vie, soins et premiers secours</td></tr>
+    <tr><td>Coordonnateur circulation</td><td class="num">1</td><td>Sécurité des usagers, signalisation temporaire (voir §7.2)</td></tr>
+  </table>
+
+  <h2>10.2 Analyse des risques et mesures de prévention</h2>
+  <table class="long">
+    <caption>Tableau 10.2 — Principaux risques et mesures de prévention</caption>
+    <tr><th>Risque</th><th>Situation exposante</th><th>Mesures de prévention retenues</th></tr>
+    <tr><td>Heurt par véhicule (usager)</td><td>Travaux en bord de voie circulée</td><td>Séparation physique par séparateurs lestés, limitation de vitesse progressive, port du vêtement haute visibilité, interdiction de travailler dos à la circulation, éclairage des zones de nuit</td></tr>
+    <tr><td>Heurt par engin de chantier</td><td>Coactivité engins/piétons sur emprise</td><td>Plan de circulation interne, zones piétonnes matérialisées, avertisseurs de recul, caméras de recul, aide à la manœuvre obligatoire en zone confinée</td></tr>
+    <tr><td>Ensevelissement en fouille</td><td>Assainissement, purges, réseaux</td><td>Blindage systématique au-delà de 1,30 m, interdiction d'accès aux fouilles non blindées, échelles d'accès tous les 15 m, contrôle quotidien des blindages</td></tr>
+    <tr><td>Électrisation</td><td>Réseaux aériens et enterrés</td><td>Consignation avant intervention, distances de sécurité affichées, détection préalable, fouilles manuelles à proximité, habilitations à jour</td></tr>
+    <tr><td>Chute de hauteur</td><td>Ouvrages, passerelles, talus</td><td>Garde-corps, harnais avec points d'ancrage vérifiés, plateformes de travail conformes</td></tr>
+    <tr><td>Noyade</td><td>Travaux en fond de fouille avec nappe, exutoires</td><td>Pompage permanent, gilets pour les travaux à proximité des exutoires en eau, interdiction du travail isolé</td></tr>
+    <tr><td>Brûlure</td><td>Enrobés, liants chauds</td><td>Équipements de protection spécifiques, procédure de chargement, formation des applicateurs</td></tr>
+    <tr><td>Bruit</td><td>Compactage, concassage, centrale</td><td>Protections auditives obligatoires en zone signalée, mesures d'exposition, rotation des postes</td></tr>
+    <tr><td>Poussières et silice</td><td>Terrassement, concassage, sciage</td><td>Arrosage systématique, sciage à l'eau, masques de protection respiratoire adaptés</td></tr>
+    <tr><td>Risques liés à la chaleur</td><td>Travail en climat chaud et humide</td><td>Points d'eau potable sur chaque atelier, aménagement des horaires en période chaude, zones d'ombre, sensibilisation à l'hydratation</td></tr>
+    <tr><td>Risque routier (trajets)</td><td>Rotations de camions</td><td>Plan de transport, limitation des vitesses, contrôle des temps de conduite, entretien des véhicules</td></tr>
+    <tr><td>Risques sanitaires</td><td>Paludisme, maladies hydriques</td><td>Assainissement de la base-vie, lutte contre les gîtes larvaires, sensibilisation, accès aux soins</td></tr>
+  </table>
+
+  <h2>10.3 Formation, accueil et sensibilisation</h2>
+  <ul>
+    <li><b>Accueil sécurité obligatoire</b> — toute personne entrant sur le chantier, y
+      compris le personnel des sous-traitants, des concessionnaires et les visiteurs, suit un
+      accueil sécurité avant son premier accès&nbsp;; sans validation de cet accueil, l'accès est
+      refusé.</li>
+    <li><b>Quart d'heure sécurité hebdomadaire</b> par équipe, animé par le chef d'atelier,
+      sur un thème lié aux travaux de la semaine.</li>
+    <li><b>Formations spécifiques</b> — conduite d'engins, travail en fouille, habilitations
+      électriques, signalisation temporaire, secourisme, manipulation des produits
+      bitumineux.</li>
+    <li><b>Causeries de prévention</b> avant toute tâche nouvelle ou à risque particulier,
+      avec relevé des participants.</li>
+    <li><b>Analyse systématique des presqu'accidents</b> — un presqu'accident est déclaré et
+      analysé comme un accident, sans sanction du déclarant.</li>
+  </ul>
+
+  <h2>10.4 Protections collectives et individuelles</h2>
+  <p>
+    La priorité est donnée aux protections collectives&nbsp;: séparateurs de voies, blindages,
+    garde-corps, balisages rigides, éclairage. Les équipements de protection individuelle
+    interviennent en complément et comprennent, en dotation de base pour l'ensemble du
+    personnel&nbsp;: casque, chaussures de sécurité, vêtement haute visibilité, gants adaptés à
+    la tâche et protection auditive en zone signalée. Les dotations spécifiques (harnais,
+    masques respiratoires, écrans faciaux, équipements pour travaux bitumineux) sont
+    attribuées par poste et contrôlées mensuellement.
+  </p>
+
+  <h2>10.5 Sécurité des usagers et des riverains</h2>
+  <div class="callout">
+    <b>Principe directeur.</b> Un usager ou un riverain n'a pas reçu de formation à la
+    sécurité, ne porte aucun équipement de protection et n'a pas connaissance du chantier.
+    Le dispositif doit donc être conçu pour être sûr <b>sans exiger d'eux le moindre
+    comportement particulier</b>&nbsp;: c'est la séparation physique, la lisibilité de la
+    signalisation et l'éclairage qui assurent leur sécurité, jamais leur vigilance.
+  </div>
+  <ul>
+    <li>Cheminements piétons continus, d'une largeur minimale de 1,40 m, balisés
+      physiquement, éclairés et maintenus praticables par temps de pluie.</li>
+    <li>Traversées piétonnes provisoires matérialisées aux droits des écoles, du centre de
+      santé et des marchés, avec signalisation renforcée.</li>
+    <li>Fouilles et tranchées ouvertes systématiquement barriérées et éclairées la nuit&nbsp;;
+      aucune fouille laissée ouverte sans protection en fin de poste.</li>
+    <li>Présence d'agents de circulation aux heures d'entrée et de sortie des écoles.</li>
+    <li>Nettoyage quotidien des voies circulées en sortie de chantier, et lavage des roues
+      des camions pour éviter tout dépôt de boue sur la chaussée en circulation.</li>
+  </ul>
+
+  <h2>10.6 Organisation des secours</h2>
+  <table>
+    <caption>Tableau 10.3 — Dispositif de secours</caption>
+    <tr><th>Élément</th><th>Disposition</th></tr>
+    <tr><td>Poste de secours</td><td>Infirmerie en base-vie, armée par un infirmier aux heures de travail</td></tr>
+    <tr><td>Trousses de premiers secours</td><td>Une par atelier et par véhicule de service, contrôlées mensuellement</td></tr>
+    <tr><td>Secouristes</td><td>Au minimum deux par section active et par poste</td></tr>
+    <tr><td>Véhicule d'évacuation</td><td>Un véhicule dédié disponible en permanence sur le chantier</td></tr>
+    <tr><td>Conventions hospitalières</td><td>Établies avec deux structures de santé de Douala avant le démarrage</td></tr>
+    <tr><td>Consignes d'alerte</td><td>Affichées sur chaque atelier et en base&nbsp;: numéros, itinéraires d'accès, point de rassemblement</td></tr>
+    <tr><td>Exercices</td><td>Un exercice d'évacuation et d'alerte par semestre, avec retour d'expérience</td></tr>
+  </table>
+
+  <h2>10.7 Indicateurs et suivi</h2>
+  <table>
+    <caption>Tableau 10.4 — Indicateurs sécurité suivis mensuellement</caption>
+    <tr><th>Indicateur</th><th class="num">Objectif</th><th>Périodicité</th></tr>
+    <tr><td>Accidents mortels ou graves</td><td class="num">0</td><td>Suivi permanent</td></tr>
+    <tr><td>Taux de fréquence des accidents avec arrêt</td><td class="num">&lt; 8</td><td>Mensuelle</td></tr>
+    <tr><td>Taux de gravité</td><td class="num">&lt; 0,35</td><td>Mensuelle</td></tr>
+    <tr><td>Accueils sécurité réalisés / entrants</td><td class="num">100 %</td><td>Mensuelle</td></tr>
+    <tr><td>Quarts d'heure sécurité tenus</td><td class="num">≥ 95 % du prévu</td><td>Mensuelle</td></tr>
+    <tr><td>Presqu'accidents déclarés et analysés</td><td class="num">100 %</td><td>Mensuelle</td></tr>
+    <tr><td>Contrôles de signalisation temporaire</td><td class="num">1 / jour</td><td>Quotidienne</td></tr>
+    <tr><td>Levée des écarts relevés en visite sécurité</td><td class="num">≤ 7 jours</td><td>Mensuelle</td></tr>
+  </table>
+  <p>
+    Ces indicateurs sont présentés en revue mensuelle d'opération et figurent au rapport
+    mensuel transmis au maître d'œuvre.
+  </p>
+</div>
+<div class="chapter" id="ch11">
+  <h1><span class="cnum">11.</span> Management environnemental et social</h1>
+
+  <p class="lead">
+    Le chantier se déroule en milieu urbain dense, à proximité de zones de bas-fond
+    connectées au réseau hydrographique du Wouri. Les impacts environnementaux y sont
+    immédiats et visibles&nbsp;: une pollution accidentelle ou un rejet de fines en saison des
+    pluies atteint le milieu récepteur en quelques heures. Le plan de gestion
+    environnementale et sociale de chantier est établi en conséquence, selon le système de
+    management certifié ISO 14001 de l'entreprise.
+  </p>
+
+  <h2>11.1 Cadre et engagements</h2>
+  <p>
+    L'entreprise s'engage à respecter la réglementation environnementale nationale, les
+    prescriptions de l'étude d'impact environnemental et social de l'opération et les
+    clauses environnementales du marché. Le plan de gestion environnementale et sociale de
+    chantier est soumis au visa du maître d'œuvre avant tout démarrage et actualisé à chaque
+    changement de phase significatif.
+  </p>
+
+  <h2>11.2 Organisation</h2>
+  <table>
+    <caption>Tableau 11.1 — Moyens affectés au volet environnemental et social</caption>
+    <tr><th>Fonction</th><th class="num">Effectif</th><th>Mission</th></tr>
+    <tr><td>Responsable environnement et social</td><td class="num">1</td><td>Pilotage du PGES chantier, contrôles, reporting, relation avec les autorités environnementales</td></tr>
+    <tr><td>Médiateur riverain</td><td class="num">1</td><td>Interface permanente avec les riverains et commerçants (voir §7.4)</td></tr>
+    <tr><td>Agents environnement de terrain</td><td class="num">2</td><td>Contrôle des aires étanches, du tri des déchets, de l'arrosage, des rejets</td></tr>
+  </table>
+
+  <h2>11.3 Gestion des eaux et prévention des pollutions</h2>
+  <ul>
+    <li><b>Aires étanches obligatoires</b> — tout ravitaillement en carburant, tout appoint
+      d'huile et tout entretien mécanique s'effectue exclusivement sur aire étanche équipée
+      d'un séparateur à hydrocarbures. L'entretien d'engins hors de ces aires est interdit,
+      sans exception, y compris en cas de panne sur site&nbsp;: l'engin est alors remorqué.</li>
+    <li><b>Kits antipollution</b> — un kit d'absorbants est disponible sur chaque atelier et
+      dans chaque véhicule de service&nbsp;; leur emplacement est connu de tout le personnel et
+      vérifié lors des visites hebdomadaires.</li>
+    <li><b>Eaux d'exhaure</b> — les eaux de pompage des fouilles ne sont jamais rejetées
+      directement au milieu&nbsp;: elles transitent par un bassin de décantation avant rejet, afin
+      de retenir les fines.</li>
+    <li><b>Eaux usées de la base-vie</b> — collectées vers une fosse septique étanche,
+      vidangée par un prestataire agréé, avec bordereaux conservés.</li>
+    <li><b>Lavage des toupies et du matériel béton</b> — exclusivement sur aire dédiée avec
+      bassin de décantation&nbsp;; les résidus durcis sont évacués en filière inerte.</li>
+    <li><b>Stockage des produits dangereux</b> — sur rétention couverte, avec fiches de
+      données de sécurité affichées et inventaire tenu à jour.</li>
+  </ul>
+  <div class="callout">
+    <b>Vigilance particulière en zone Z1.</b> Entre les PK 0+000 et 2+600, la nappe est
+    subaffleurante et connectée au réseau de bas-fonds. Aucun stockage d'hydrocarbures ni
+    aucune aire d'entretien n'est implanté dans cette zone&nbsp;; le ravitaillement des engins y
+    travaillant s'effectue par camion-citerne équipé d'un bac de rétention mobile, sous
+    surveillance d'un agent environnement.
+  </div>
+
+  <h2>11.4 Gestion des déchets</h2>
+  <table>
+    <caption>Tableau 11.2 — Filières de gestion des déchets</caption>
+    <tr><th>Type de déchet</th><th>Origine</th><th>Filière retenue</th><th>Traçabilité</th></tr>
+    <tr><td>Déblais inertes non réutilisables</td><td>Terrassements, purges</td><td>Dépôt autorisé, remblaiement d'emprunts</td><td>Bordereaux de transport</td></tr>
+    <tr><td>Gravats de démolition</td><td>Démolitions, dépose de chaussée</td><td>Concassage et réemploi en remblai de tranchée</td><td>Registre de réemploi</td></tr>
+    <tr><td>Fraisats d'enrobés</td><td>Rabotage de chaussée</td><td>Réemploi en accotements ou pistes de chantier</td><td>Registre de réemploi</td></tr>
+    <tr><td>Huiles usagées et filtres</td><td>Maintenance du parc</td><td>Collecteur agréé</td><td>Bordereaux de suivi</td></tr>
+    <tr><td>Emballages souillés, absorbants</td><td>Ateliers, kits antipollution</td><td>Filière déchets dangereux agréée</td><td>Bordereaux de suivi</td></tr>
+    <tr><td>Ferrailles et chutes métalliques</td><td>Ferraillage, ouvrages</td><td>Valorisation par filière de récupération</td><td>Bons de reprise</td></tr>
+    <tr><td>Déchets assimilés domestiques</td><td>Base-vie, bureaux</td><td>Collecte municipale ou prestataire agréé</td><td>Contrat de collecte</td></tr>
+    <tr><td>Déchets de curage</td><td>Curage des drains existants</td><td>Ressuyage puis évacuation en dépôt autorisé</td><td>Bordereaux de transport</td></tr>
+  </table>
+  <p>
+    Une zone de tri est aménagée en base principale, avec bennes identifiées et signalées. Le
+    brûlage de déchets sur le chantier est formellement interdit, de même que tout
+    enfouissement sauvage&nbsp;; ces interdictions figurent au règlement intérieur de chantier et
+    sont rappelées à chaque accueil sécurité.
+  </p>
+
+  <h2>11.5 Air, poussières, bruit et vibrations</h2>
+  <ul>
+    <li><b>Poussières</b> — arrosage des pistes et des zones de terrassement à raison de deux
+      passages quotidiens minimum en saison sèche, porté à quatre en période de vent&nbsp;;
+      bâchage obligatoire des camions transportant des matériaux fins&nbsp;; limitation de vitesse
+      à 30 km/h sur les pistes de chantier.</li>
+    <li><b>Bruit</b> — engins conformes aux normes d'émission sonore, entretien régulier des
+      silencieux, interdiction des travaux bruyants avant 6h et après 20h en zone
+      résidentielle, information préalable des riverains en cas d'opération nocturne
+      inévitable.</li>
+    <li><b>Vibrations</b> — adaptation des modalités de compactage à proximité immédiate des
+      constructions riveraines (compactage statique ou plaque vibrante de faible énergie à
+      moins de 10 m), après constat d'huissier préalable de l'état des bâtiments.</li>
+    <li><b>Émissions des engins</b> — contrôle périodique des moteurs, extinction obligatoire
+      des moteurs à l'arrêt prolongé, interdiction des engins visiblement défectueux.</li>
+  </ul>
+
+  <h2>11.6 Emprunts, carrières et remise en état</h2>
+  <p>
+    Les matériaux d'apport proviennent de sites d'emprunt et de carrières disposant des
+    autorisations d'exploitation requises. Pour chaque site ouvert par l'entreprise, un plan
+    d'exploitation et de remise en état est établi avant ouverture et soumis au maître
+    d'œuvre. La remise en état comprend&nbsp;: le régalage des fronts et le reprofilage des
+    talus à une pente stable, le rétablissement du drainage naturel, le régalage de la terre
+    végétale préalablement décapée et stockée séparément, et la revégétalisation.
+  </p>
+  <p>
+    Les mêmes dispositions s'appliquent aux installations de chantier&nbsp;: à l'issue des
+    travaux, les bases sont démantelées, les aires bétonnées déposées, les sols décompactés,
+    les éventuelles souillures traitées et le terrain restitué dans un état au moins
+    équivalent à son état initial, constaté contradictoirement.
+  </p>
+
+  <h2>11.7 Biodiversité, patrimoine et découvertes fortuites</h2>
+  <p>
+    Les zones de bas-fond traversées présentent une végétation hygrophile dont l'emprise
+    d'atteinte est strictement limitée à la largeur nécessaire aux travaux&nbsp;; aucun dépôt ni
+    aucune circulation d'engin n'est autorisé au-delà des emprises balisées. L'abattage
+    d'arbres est limité aux sujets situés dans l'emprise et compensé par replantation à
+    raison de trois pour un.
+  </p>
+  <p>
+    En cas de découverte fortuite de vestiges archéologiques ou de sépultures, les travaux
+    sont immédiatement suspendus dans la zone concernée, le périmètre est protégé et le
+    maître d'œuvre ainsi que les autorités compétentes sont informés sans délai. Les travaux
+    ne reprennent qu'après autorisation écrite.
+  </p>
+
+  <h2>11.8 Volet social</h2>
+  <h3>Contenu local et retombées économiques</h3>
+  <p>
+    Les engagements en matière d'emploi local, de formation et de sous-traitance auprès de
+    PME locales sont détaillés au paragraphe 4.5. Ils font l'objet d'un reporting mensuel
+    chiffré transmis au maître d'œuvre.
+  </p>
+  <h3>Code de conduite et prévention des violences</h3>
+  <p>
+    L'ensemble du personnel, y compris celui des sous-traitants, signe un code de conduite
+    individuel dont la remise est intégrée à l'accueil sécurité. Ce code prohibe
+    explicitement toute forme de harcèlement, d'exploitation ou d'abus, notamment à
+    l'encontre des femmes et des mineurs, ainsi que le travail des enfants sous toutes ses
+    formes. Des séances de sensibilisation sont organisées trimestriellement.
+  </p>
+  <p>
+    Un <b>mécanisme de gestion des plaintes</b> accessible aux travailleurs comme aux
+    riverains est mis en place&nbsp;: registre tenu en base et sur chaque section, possibilité de
+    saisine anonyme, traitement sous sept jours, et information du plaignant sur la suite
+    donnée. Les plaintes relatives à des faits graves sont transmises sans délai au maître
+    d'ouvrage et aux autorités compétentes.
+  </p>
+  <h3>Conditions de vie et de travail</h3>
+  <p>
+    La base-vie comprend des sanitaires séparés et en nombre suffisant, un réfectoire, des
+    vestiaires, un point d'eau potable et une infirmerie. Les contrats de travail sont
+    écrits et déclarés, les salaires versés par voie traçable, et le respect des durées
+    maximales de travail contrôlé par le registre de présence.
+  </p>
+
+  <h2>11.9 Suivi et indicateurs</h2>
+  <table>
+    <caption>Tableau 11.3 — Indicateurs environnementaux et sociaux</caption>
+    <tr><th>Indicateur</th><th class="num">Objectif</th><th>Périodicité</th></tr>
+    <tr><td>Déversements accidentels non maîtrisés</td><td class="num">0</td><td>Suivi permanent</td></tr>
+    <tr><td>Déchets dangereux tracés par bordereau</td><td class="num">100 %</td><td>Mensuelle</td></tr>
+    <tr><td>Contrôles des aires étanches conformes</td><td class="num">100 %</td><td>Hebdomadaire</td></tr>
+    <tr><td>Passages d'arrosage réalisés / prévus</td><td class="num">≥ 95 %</td><td>Hebdomadaire</td></tr>
+    <tr><td>Plaintes riveraines traitées sous 7 jours</td><td class="num">100 %</td><td>Mensuelle</td></tr>
+    <tr><td>Main-d'œuvre locale (non qualifiée)</td><td class="num">100 %</td><td>Mensuelle</td></tr>
+    <tr><td>Part des emplois féminins</td><td class="num">≥ 12 %</td><td>Mensuelle</td></tr>
+    <tr><td>Codes de conduite signés / effectif</td><td class="num">100 %</td><td>Mensuelle</td></tr>
+    <tr><td>Sites d'emprunt remis en état</td><td class="num">100 % à la réception</td><td>À l'achèvement</td></tr>
+    <tr><td>Arbres replantés / arbres abattus</td><td class="num">≥ 3 pour 1</td><td>À l'achèvement</td></tr>
+  </table>
+</div>
+<div class="chapter" id="ch12">
+  <h1><span class="cnum">12.</span> Gestion documentaire, reporting et communication</h1>
+
+  <p class="lead">
+    Sur une opération de 24 mois mobilisant jusqu'à 420 personnes et sept sections
+    simultanées, la maîtrise documentaire conditionne la traçabilité des décisions et la
+    qualité du dossier de récolement. Les documents ne sont pas reconstitués en fin de
+    chantier&nbsp;: ils sont produits et archivés au fil de l'exécution.
+  </p>
+
+  <h2>12.1 Organisation documentaire</h2>
+  <p>
+    Un système de gestion documentaire unique est mis en place dès la phase de préparation.
+    Chaque document porte une référence normalisée, un indice de révision et une date, et
+    fait l'objet d'un circuit de diffusion défini. Une copie papier des documents opposables
+    — plans visés, procédures d'exécution, plans de signalisation, consignes de sécurité —
+    est disponible en permanence sur chaque section active&nbsp;: l'exécutant doit pouvoir
+    vérifier la version applicable sans dépendre d'un accès numérique.
+  </p>
+  <table>
+    <caption>Tableau 12.1 — Documents produits et circuits de diffusion</caption>
+    <tr><th>Document</th><th>Émetteur</th><th>Destinataires</th><th class="num">Fréquence</th></tr>
+    <tr><td>Rapport journalier de chantier</td><td>Chefs de section</td><td>Conducteur de travaux, direction de projet</td><td class="num">Quotidienne</td></tr>
+    <tr><td>Compte rendu de réunion de chantier</td><td>Maître d'œuvre / entreprise</td><td>Tous participants</td><td class="num">Hebdomadaire</td></tr>
+    <tr><td>Rapport mensuel d'avancement</td><td>Direction de projet</td><td>Maître d'ouvrage, maître d'œuvre</td><td class="num">Mensuelle</td></tr>
+    <tr><td>Planning actualisé et note d'écart</td><td>Responsable méthodes</td><td>Maître d'œuvre</td><td class="num">Mensuelle</td></tr>
+    <tr><td>Procès-verbaux d'essais</td><td>Laboratoire</td><td>Maître d'œuvre, responsable qualité</td><td class="num">Au fil des essais</td></tr>
+    <tr><td>Registre des points d'arrêt</td><td>Responsable qualité</td><td>Maître d'œuvre</td><td class="num">Permanente</td></tr>
+    <tr><td>Fiches de non-conformité</td><td>Responsable qualité</td><td>Maître d'œuvre, direction de projet</td><td class="num">À l'occurrence</td></tr>
+    <tr><td>Rapport HSE mensuel</td><td>Responsable HSE</td><td>Maître d'œuvre, siège</td><td class="num">Mensuelle</td></tr>
+    <tr><td>Rapport environnemental et social</td><td>Responsable E&amp;S</td><td>Maître d'ouvrage, maître d'œuvre</td><td class="num">Mensuelle</td></tr>
+    <tr><td>Registre des doléances riveraines</td><td>Médiateur</td><td>Direction de projet, maître d'œuvre</td><td class="num">Permanente</td></tr>
+  </table>
+
+  <h2>12.2 Contenu du rapport mensuel</h2>
+  <p>
+    Le rapport mensuel transmis au maître d'œuvre comprend systématiquement&nbsp;: l'avancement
+    physique par section et par nature d'ouvrage rapporté aux prévisions&nbsp;; l'analyse des
+    écarts de planning et les mesures engagées&nbsp;; la synthèse des contrôles et essais avec le
+    taux de conformité&nbsp;; l'état des non-conformités ouvertes et clôturées&nbsp;; les indicateurs
+    sécurité et environnementaux&nbsp;; l'état des effectifs et du matériel mobilisé&nbsp;; l'état des
+    interfaces réseaux et emprises&nbsp;; le registre des doléances riveraines et leur
+    traitement&nbsp;; et un reportage photographique daté par section.
+  </p>
+
+  <h2>12.3 Communication externe</h2>
+  <p>
+    La communication vers les usagers et les riverains est assurée en coordination avec le
+    maître d'ouvrage, qui en conserve la maîtrise éditoriale. Les supports prévus sont&nbsp;:
+    panneaux d'information de chantier aux deux extrémités et à chaque carrefour majeur,
+    affichage des phases à venir sur chaque section, annonces radiophoniques locales avant
+    chaque basculement de circulation, et information directe par le médiateur riverain pour
+    toute intervention affectant un accès.
+  </p>
+</div>
+
+<div class="chapter" id="ch13">
+  <h1><span class="cnum">13.</span> Garantie, entretien et fin de chantier</h1>
+
+  <h2>13.1 Opérations préalables à la réception</h2>
+  <p>
+    Avant la demande de réception, l'entreprise procède à une <b>auto-revue contradictoire</b>
+    section par section, dont les conclusions sont consignées et transmises au maître
+    d'œuvre. Cette revue porte sur&nbsp;: la conformité géométrique de la chaussée et des
+    trottoirs, l'uni et la compacité du revêtement, le fonctionnement hydraulique complet du
+    réseau d'assainissement sous écoulement réel, l'état des ouvrages et de leurs abords, la
+    conformité de la signalisation horizontale et verticale, le fonctionnement de
+    l'éclairage public après essai continu de 72 heures, la reprise des plantations, et la
+    remise en état des emprises et des installations.
+  </p>
+  <p>
+    Les réserves formulées par le maître d'œuvre font l'objet d'un tableau de suivi unique,
+    avec pour chacune un responsable désigné et une date d'engagement de levée. Les moyens
+    nécessaires à la levée des réserves sont maintenus sur site jusqu'à leur clôture
+    complète.
+  </p>
+
+  <h2>13.2 Période de garantie</h2>
+  <table>
+    <caption>Tableau 13.1 — Engagements pendant la période de garantie</caption>
+    <tr><th>Engagement</th><th>Modalité</th><th class="num">Délai d'intervention</th></tr>
+    <tr><td>Astreinte technique</td><td>Interlocuteur désigné et joignable, moyens d'intervention mobilisables</td><td class="num">Permanente</td></tr>
+    <tr><td>Désordre compromettant la sécurité</td><td>Mise en sécurité immédiate puis réparation</td><td class="num">24 heures</td></tr>
+    <tr><td>Désordre affectant l'écoulement des eaux</td><td>Intervention prioritaire, curage ou reprise</td><td class="num">72 heures</td></tr>
+    <tr><td>Désordre de chaussée ou d'ouvrage</td><td>Diagnostic contradictoire puis réparation</td><td class="num">15 jours</td></tr>
+    <tr><td>Reprise des plantations non reprises</td><td>Remplacement des sujets morts</td><td class="num">À chaque campagne</td></tr>
+    <tr><td>Visites périodiques</td><td>Visite contradictoire de l'ensemble du linéaire</td><td class="num">Semestrielle</td></tr>
+    <tr><td>Visite de fin de garantie</td><td>Revue générale contradictoire avant levée définitive</td><td class="num">1 mois avant échéance</td></tr>
+  </table>
+
+  <h2>13.3 Transfert vers l'exploitant</h2>
+  <p>
+    Au-delà des obligations contractuelles, l'entreprise organise, à la réception, une
+    <b>session de transfert</b> à l'attention des services chargés de l'entretien de la voirie.
+    Cette session porte sur les points dont dépend la durabilité de l'ouvrage&nbsp;: périodicité
+    et modalités de curage du réseau d'assainissement, accès aux regards et aux dalles
+    amovibles, points singuliers du drainage, entretien de la signalisation et de
+    l'éclairage, et surveillance des zones de purge en zone Z1. Un manuel d'entretien
+    illustré, accompagné des plans de récolement, est remis à cette occasion.
+  </p>
+  <div class="callout">
+    <b>Raison de cette disposition.</b> Un réseau d'assainissement dimensionné correctement
+    mais non curé perd l'essentiel de sa capacité en deux à trois saisons des pluies. La
+    durabilité de l'investissement dépend donc autant de l'exécution que de la transmission
+    effective des règles d'entretien à ceux qui en auront la charge.
+  </div>
+</div>
+
+<div class="chapter" id="ch14">
+  <h1><span class="cnum">14.</span> Annexes au mémoire technique</h1>
+
+  <p class="lead">
+    Les pièces listées ci-après complètent le présent mémoire. Dans un dossier réel, elles
+    seraient jointes en volume séparé. Elles sont mentionnées ici pour illustrer la
+    composition attendue d'un dossier complet.
+  </p>
+
+  <table class="long">
+    <caption>Tableau 14.1 — Liste des annexes</caption>
+    <tr><th>N°</th><th>Intitulé</th><th>Objet</th></tr>
+    <tr><td>A1</td><td>Organigramme détaillé de l'opération</td><td>Format A3, avec noms, fonctions et liaisons hiérarchiques</td></tr>
+    <tr><td>A2</td><td>Planning général des travaux</td><td>Diagramme de Gantt à ressources, format A1, avec chemin critique</td></tr>
+    <tr><td>A3</td><td>Curriculums vitae de l'encadrement</td><td>CV détaillés, diplômes et attestations de références</td></tr>
+    <tr><td>A4</td><td>Liste détaillée du matériel</td><td>Avec numéros de série, années de mise en service et justificatifs de propriété</td></tr>
+    <tr><td>A5</td><td>Fiches de références détaillées</td><td>Attestations de bonne exécution des maîtres d'ouvrage</td></tr>
+    <tr><td>A6</td><td>Certificats et agréments</td><td>Certifications de système, agréments et accréditation du laboratoire</td></tr>
+    <tr><td>A7</td><td>Plan d'assurance qualité</td><td>Note d'organisation, procédures d'exécution, plan de contrôle et plan d'essais</td></tr>
+    <tr><td>A8</td><td>Plan particulier de sécurité et de protection de la santé</td><td>Analyse des risques complète et mesures associées</td></tr>
+    <tr><td>A9</td><td>Plan de gestion environnementale et sociale de chantier</td><td>Déclinaison opérationnelle des prescriptions environnementales</td></tr>
+    <tr><td>A10</td><td>Plans de signalisation temporaire</td><td>Un schéma par configuration de phase</td></tr>
+    <tr><td>A11</td><td>Plan d'installation de chantier</td><td>Implantation des bases, aires, circulations internes et stockages</td></tr>
+    <tr><td>A12</td><td>Note de méthodologie des ouvrages hydrauliques</td><td>Phasage détaillé de construction sous circulation</td></tr>
+    <tr><td>A13</td><td>Attestations d'assurance</td><td>Responsabilité civile, décennale, tous risques chantier</td></tr>
+    <tr><td>A14</td><td>États financiers certifiés</td><td>Trois derniers exercices, avec rapports des commissaires aux comptes</td></tr>
+  </table>
+
+  <h2>Rappel final sur le statut de ce document</h2>
+  <div class="warn-box">
+    <strong>Document d'illustration.</strong> Ce mémoire technique a été rédigé manuellement
+    à des fins de démonstration de structure et de mise en forme. Il ne constitue pas une
+    sortie de la plateforme de génération automatique et ne doit pas être présenté comme
+    telle. L'entreprise ALPHA TP CAMEROUN SA, son encadrement, ses références, ses
+    certifications, son parc matériel et l'ensemble des données chiffrées de ce document
+    sont fictifs et ne correspondent à aucune entité ni à aucune personne réelle. Le cadre
+    du projet — maître d'ouvrage, caractéristiques et quantités — est également fictif.
+  </div>
+
+  <p class="sig">
+    Fait à Douala, en septembre 2026.<br>
+    Document d'illustration — exemple de rendu cible pour un mémoire technique de réponse à
+    appel d'offres en travaux routiers urbains.
+  </p>
+</div>
+
+</body>
+</html>

@@ -20,6 +20,9 @@ from pydantic import ValidationError
 from app.models.pydantic import Complexite, Expert, Intent, SousQuestion, SuperviseurOutput
 from app.services.chat_history import format_history
 from app.services.ollama_llm import ollama_generate_json
+from app.workflow.nodes.route import EXPORT_KEYWORDS, GEN_KEYWORDS
+from app.workflow.nodes.route import is_extend_request as _is_extend_request
+from app.workflow.nodes.route import is_proposal_request as _is_proposal_request
 from app.workflow.nodes.route import route as _legacy_route
 
 log = logging.getLogger("btp.superviseur")
@@ -100,8 +103,20 @@ def _fallback(query: str) -> SuperviseurOutput:
     )
 
 
-def run_superviseur(query_clean: str, history: list[dict] | None) -> SuperviseurOutput:
+def run_superviseur(
+    query_clean: str, history: list[dict] | None, *, raw_query: str | None = None
+) -> SuperviseurOutput:
+    """`raw_query` : le message TEL QUE tapé, avant `rewrite_query`. Les
+    garde-fous mots-clés ci-dessous testent CE texte, pas `query_clean` —
+    `rewrite_query` transforme délibérément un impératif ("Rédige...",
+    "Exporte...") en phrase de recherche neutre pour le retrieval (son
+    prompt le dit explicitement : "une PHRASE DE RECHERCHE, pas une réponse
+    à la question"), ce qui efface justement le verbe d'action dont ces
+    garde-fous ont besoin. Bug réel observé : "Rédige la présentation..."
+    réécrit en une phrase sans "rédige" faisait passer le message au travers
+    du garde-fou run_section."""
     query_clean = (query_clean or "").strip()
+    guard_text = (raw_query or query_clean or "").strip()
     if not query_clean:
         return SuperviseurOutput(intent=Intent.smalltalk, is_compound=False, sous_questions=[])
 
@@ -112,7 +127,9 @@ def run_superviseur(query_clean: str, history: list[dict] | None) -> Superviseur
         question=query_clean,
     )
     try:
-        body = ollama_generate_json(prompt, timeout=90)
+        # num_ctx=4096 : l'historique de conversation peut grandir, sans
+        # cette borne Ollama tronquerait en silence à son défaut (2048).
+        body = ollama_generate_json(prompt, timeout=90, num_ctx=4096)
         output = SuperviseurOutput.model_validate(body)
     except (ValidationError, ValueError, TypeError) as exc:
         log.warning("Superviseur — JSON invalide, repli déterministe : %s", exc)
@@ -130,6 +147,43 @@ def run_superviseur(query_clean: str, history: list[dict] | None) -> Superviseur
     if len(output.sous_questions) > MAX_SOUS_QUESTIONS:
         log.warning("Superviseur — %d sous-questions > max, tronqué", len(output.sous_questions))
         output.sous_questions = output.sous_questions[:MAX_SOUS_QUESTIONS]
+
+    lowered_query = guard_text.lower()
+    if output.intent == Intent.export and not any(w in lowered_query for w in EXPORT_KEYWORDS):
+        # intent="export" déclenche un TÉLÉCHARGEMENT silencieux côté client
+        # (SSE export_ready) dès que ce message arrive — un faux positif
+        # (observé sur un message aussi court que "pourquoi ?", un petit
+        # modèle local le classe parfois export) surprend l'utilisateur avec
+        # un fichier généré au lieu d'une réponse. Une vraie demande d'export
+        # contient toujours un mot sans ambiguïté (export, télécharge, docx,
+        # pdf...) — sans ça, on ne fait jamais confiance à la seule
+        # classification du LLM pour une action aussi visible. Ce garde-fou
+        # tourne AVANT celui de run_section ci-dessous : un faux "export" doit
+        # pouvoir retomber sur "run_section" s'il en a le mot-clé, pas
+        # s'arrêter à mi-chemin sur hybrid_rag.
+        log.warning(
+            "Superviseur — intent=export sans mot-clé explicite, requalifié hybrid_rag (message=%r)",
+            guard_text[:80],
+        )
+        output.intent = Intent.hybrid_rag
+
+    if output.intent not in (Intent.export, Intent.run_section) and (
+        any(w in lowered_query for w in GEN_KEYWORDS)
+        or _is_extend_request(guard_text)
+        or _is_proposal_request(guard_text)
+    ):
+        # Même logique que le garde-fou export ci-dessus : "ajoute plus de
+        # contenu" / "rédige en plus" sont des demandes de rédaction sans
+        # ambiguïté lexicale, observées mal classées (parfois même en
+        # "export", corrigé juste au-dessus) par ce petit modèle local — ne
+        # pas laisser passer un faux négatif aussi facile à détecter
+        # déterministiquement.
+        log.warning(
+            "Superviseur — intent=%s malgré un mot-clé de rédaction/enrichissement/proposition explicite, "
+            "requalifié run_section (message=%r)",
+            output.intent.value, guard_text[:80],
+        )
+        output.intent = Intent.run_section
 
     if output.intent == Intent.clarification_needed and output.sous_questions:
         # R7 : clarification_needed → sous_questions=[] TOUJOURS. Si le modèle
